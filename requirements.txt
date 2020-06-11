@@ -5,3 +5,4 @@ scikit-learn>=0.22.2
 opencv-python>=4.1.2.30
 opencv-contrib-python>=4.1.2.30
 pandas>=0.25.1
+keras-tuner>=1.0.1
