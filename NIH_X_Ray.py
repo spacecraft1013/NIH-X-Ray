@@ -54,6 +54,6 @@ model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=250)
 # print(tuner.get_best_hyperparameters(1)[0])
 
 test_loss, test_acc = model.evaluate(X_test, y_test)
-print('\nTest Accuracy: {}\nTest Loss: {}\nTest MAE: {}'.format(test_acc, test_loss, test_mae))
+print('\nTest Accuracy: {}\nTest Loss: {}'.format(test_acc, test_loss))
 
 #model.save('data/models/{}.h5'.format(model_save_name))
