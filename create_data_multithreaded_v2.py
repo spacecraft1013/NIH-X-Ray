@@ -5,7 +5,6 @@ import pandas as pd
 import os
 import random
 import numpy as np
-import pickle
 import keras
 import multiprocessing as mp
 import sklearn as sk
@@ -109,10 +108,10 @@ def main():
     pca.fit_transform(X_test)
 
     print("Saving Arrays")
-    pickle.dump(X_train, open(r"data/arrays/X_train_256_pca.pickle", "wb"), protocol=4)
-    pickle.dump(y_train, open(r"data/arrays/y_train_256_pca.pickle", "wb"), protocol=4)
-    pickle.dump(X_test, open(r"data/arrays/X_test_256_pca.pickle", "wb"), protocol=4)
-    pickle.dump(y_test, open(r"data/arrays/y_test_256_pca.pickle", "wb"), protocol=4)
+    np.save("data/arrays/X_train_256_pca.npy", X_train)
+    np.save("data/arrays/y_train_256_pca.npy", y_train)
+    np.save("data/arrays/X_test_256_pca.npy", X_test)
+    np.save("data/arrays/y_test_256_pca.npy", y_test)
 
 if __name__ == "__main__":
     main()

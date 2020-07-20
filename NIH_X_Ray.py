@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 import numpy as np
 import keras
-import pickle
 import datetime
 import os
 import create_data
@@ -11,14 +10,14 @@ import model
 
 model_save_name = "model_adam"
 
-if os.path.exists(r"data/arrays/X_train_128.pickle") == False:
+if os.path.exists(r"data/arrays/X_train_128.np") == False:
     create_data.main()
 
 print("Importing Arrays")
-X_train = pickle.load(open(r"data/arrays/X_train_128.pickle", "rb"))
-y_train = pickle.load(open(r"data/arrays/y_train_128.pickle", "rb"))
-X_test = pickle.load(open(r"data/arrays/X_test_128.pickle", "rb"))
-y_test = pickle.load(open(r"data/arrays/y_test_128.pickle", "rb"))
+X_train = np.load("data/arrays/X_train_128.npy")
+y_train = np.load("data/arrays/y_train_128.npy")
+X_test = np.load("data/arrays/X_test_128.npy")
+y_test = np.load("data/arrays/y_test_128.npy")
 
 model = model.model(128)
 print(model.summary())
