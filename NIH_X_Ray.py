@@ -6,42 +6,28 @@ import os
 import create_data_multithreaded_v2 as preprocessing
 import sklearn as sk
 import tensorflow as tf
-import model
+from model import model_generator
+import kerastuner as kt
 
-model_save_name = "model_adam"
+model_save_name = "model_kt"
 
 if os.path.exists(r"data/arrays/X_train_128.npy") == False:
     preprocessing.main()
 
 print("Importing Arrays")
-X_train = np.load("data/arrays/X_train_128.npy")
-y_train = np.load("data/arrays/y_train_128.npy")
-X_test = np.load("data/arrays/X_test_128.npy")
-y_test = np.load("data/arrays/y_test_128.npy")
+X_train = np.load(open(r"data/arrays/X_train_128.npy", "rb"))
+y_train = np.load(open(r"data/arrays/y_train_128.npy", "rb"))
+X_test = np.load(open(r"data/arrays/X_test_128.npy", "rb"))
+y_test = np.load(open(r"data/arrays/y_test_128.npy", "rb"))
 
-model = model.model(128)
-print(model.summary())
+tuner = kt.BayesianOptimization(model_generator, objective='val_accuracy', max_trials=500, project_name="NIH X-Ray Model")
 
-# model = keras.applications.inception_v3.InceptionV3(input_shape=(128, 128, 1), include_top=True, weights=None, classes=15)
-# model = keras.applications.mobilenet_v2.MobileNetV2(input_shape=(128, 128, 1), include_top=True, weights=None, classes=15)
-# model = keras.applications.vgg19.VGG19(input_shape=(128, 128, 1), include_top=True, weights=None, classes=15)
+tuner.search(X_train, y_train, epochs=5, validation_split=0.1)
 
-# print("Loading from previous checkpoint")
-# model.load_weights("data/checkpoints/.ckpt")
+best_model = tuner.get_best_models(1)[0]
+print(best_model.summary())
 
-# print("Computing sample weights...")
-# class_weights = sk.utils.class_weight.compute_sample_weight('balanced', y_train)
-
-checkpoint_path = "data/checkpoints/" + model_save_name + "-{epoch:03d}.ckpt"
-checkpoint_dir = os.path.dirname(checkpoint_path)
-
-model.save_weights(checkpoint_path.format(epoch=0))
-
-cp_callback = keras.callbacks.ModelCheckpoint(filepath=checkpoint_path, save_weights_only=True, verbose=1)
-
-model.fit(X_train, y_train, epochs=250, batch_size=64, validation_data=(X_test, y_test), callbacks=[cp_callback])
-
-test_loss, test_acc = model.evaluate(X_test, y_test)
+test_loss, test_acc = best_model.evaluate(X_test, y_test)
 print('\nTest Accuracy: {}\nTest Loss: {}'.format(test_acc, test_loss))
 
-model.save('data/models/{}.h5'.format(model_save_name))
+best_model.save('data/models/{}.h5'.format(model_save_name))
