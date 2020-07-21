@@ -85,10 +85,11 @@ def main():
     y_train = keras.utils.to_categorical(y_train)
     y_test = keras.utils.to_categorical(y_test)
 
-    pickle.dump(X_train, open(r"data\arrays\X_train.pickle", "wb"))
-    pickle.dump(y_train, open(r"data\arrays\y_train.pickle", "wb"))
-    pickle.dump(X_test, open(r"data\arrays\X_test.pickle", "wb"))
-    pickle.dump(y_test, open(r"data\arrays\y_test.pickle", "wb"))
+    print("Saving Arrays")
+    np.save("data/arrays/X_train_256_pca.npy", X_train)
+    np.save("data/arrays/y_train_256_pca.npy", y_train)
+    np.save("data/arrays/X_test_256_pca.npy", X_test)
+    np.save("data/arrays/y_test_256_pca.npy", y_test)
 
 if __name__ == "__main__":
     main()

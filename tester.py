@@ -2,10 +2,10 @@ import tensorflow as tf
 import keras
 import pandas
 import glob
-import pickle
+import numpy as np
 
-X_test = pickle.load(open("data/arrays/X_test.pickle", "rb"))
-y_test = pickle.load(open("data/arrays/y_test.pickle", "rb"))
+X_test = np.load(open("data/arrays/X_test_128.npy", "rb"))
+y_test = np.load(open("data/arrays/y_test_128.npy", "rb"))
 
 data = {"Model":[],
         "Accuracy":[],

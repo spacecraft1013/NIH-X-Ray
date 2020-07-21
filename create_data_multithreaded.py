@@ -4,7 +4,6 @@ import pandas as pd
 import os
 import random
 import numpy as np
-import pickle
 import keras
 import multiprocessing as mp
 
@@ -114,10 +113,10 @@ def main():
     y_test = keras.utils.to_categorical(y_test)
 
     print("Saving Arrays")
-    pickle.dump(X_train, open("data/arrays/X_train_128.pickle", "wb"), protocol=4)
-    pickle.dump(y_train, open("data/arrays/y_train_128.pickle", "wb"), protocol=4)
-    pickle.dump(X_test, open("data/arrays/X_test_128.pickle", "wb"), protocol=4)
-    pickle.dump(y_test, open("data/arrays/y_test_128.pickle", "wb"), protocol=4)
+    np.save("data/arrays/X_train_256_pca.npy", X_train)
+    np.save("data/arrays/y_train_256_pca.npy", y_train)
+    np.save("data/arrays/X_test_256_pca.npy", X_test)
+    np.save("data/arrays/y_test_256_pca.npy", y_test)
 
 if __name__ == "__main__":
     main()
