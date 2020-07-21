@@ -10,7 +10,6 @@ import sklearn as sk
 
 #Download the dataset at https://www.kaggle.com/nih-chest-xrays/data, and put the directory in the DATASET variable
 
-print("Creating Dataset")
 DATASET = r"D:/Datasets/NIH X-Rays/data"
 CATEGORIES = ["No Finding", "Atelectasis", "Cardiomegaly", "Effusion", "Infiltration", "Mass", "Nodule", "Pneumonia", "Pneumothorax", "Consolidation", "Edema", "Emphysema", "Fibrosis", "Pleural_Thickening", "Hernia"]
 
