@@ -20,9 +20,9 @@ y_train = np.load(open(r"data/arrays/y_train_128.npy", "rb"))
 X_test = np.load(open(r"data/arrays/X_test_128.npy", "rb"))
 y_test = np.load(open(r"data/arrays/y_test_128.npy", "rb"))
 
-tuner = kt.Hyperband(model_generator, objective='val_accuracy', max_epochs=250, hyperband_iterations=5)
+tuner = kt.BayesianOptimization(model_generator, objective='val_accuracy', max_trials=500, project_name="NIH X-Ray Model")
 
-tuner.search(X_train, y_train, epochs=250, validation_split=0.1)
+tuner.search(X_train, y_train, epochs=5, validation_split=0.1)
 
 best_model = tuner.get_best_models(1)[0]
 print(best_model.summary())
