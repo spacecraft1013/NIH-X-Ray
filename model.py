@@ -26,6 +26,6 @@ def model(shape_value):
     output = keras.layers.Dense(15, activation='softmax', name='output')(dense2)
 
     model = keras.models.Model(inputs=inputs, outputs=output)
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy', 'mae'])
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     return model
