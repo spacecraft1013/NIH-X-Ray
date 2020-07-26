@@ -7,11 +7,14 @@ import numpy as np
 import multiprocessing as mp
 import sklearn as sk
 from sklearn.preprocessing import MultiLabelBinarizer
+import time
 
-#Download the dataset at https://www.kaggle.com/nih-chest-xrays/data, and put the directory in the DATASET variable
+# Download the dataset at https://www.kaggle.com/nih-chest-xrays/data, and put the directory in the DATASET variable
 
 DATASET = "F:/Datasets/NIH X-Rays/data"
 CATEGORIES = ["No Finding", "Atelectasis", "Cardiomegaly", "Effusion", "Infiltration", "Mass", "Nodule", "Pneumonia", "Pneumothorax", "Consolidation", "Edema", "Emphysema", "Fibrosis", "Pleural_Thickening", "Hernia"]
+
+starttime = time.time()
 
 def findimage(name, path):
         for root, dirs, files in os.walk(path):
@@ -42,7 +45,7 @@ def preprocess(row):
         imagepath = findimage(imagename, DATASET)
         
         img_array = cv2.imread(imagepath, cv2.IMREAD_GRAYSCALE)
-        img_array = cv2.resize(img_array, (256, 256)) #I had to do this to shrink the size down for my machine, you may not need to
+        img_array = cv2.resize(img_array, (256, 256))
         
         multilabels = label.split("|")
         labels = []
@@ -99,12 +102,15 @@ def main():
         X_test.append(item[0])
         y_test.append(item[1])
 
-    X_train = np.array(X_train).reshape(-1, 256, 256, 1) #If your machine can handle the full resolution images, change this to have 1024 instead of 1024
+    X_train = np.array(X_train).reshape(-1, 256, 256, 1)
     X_test = np.array(X_test).reshape(-1, 256, 256, 1)
 
     mlb = MultiLabelBinarizer()
     y_train = mlb.fit_transform(y_train)
     y_test = mlb.fit_transform(y_test)
+
+    endtime = time.time()
+    print(f"Time taken: {int((endtime-starttime) / 60)}m {(endtime-starttime) % 60}s")
 
     print("Saving Arrays")
     np.save("data/arrays/X_train_256.npy", X_train)
