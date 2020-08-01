@@ -48,9 +48,7 @@ def preprocess(row):
         img_array = cv2.resize(img_array, (256, 256))
         
         multilabels = label.split("|")
-        labels = []
-        for label in multilabels:
-            labels.append(CATEGORIES.index(label))
+        labels = [label for label in multilabels]
 
         training_data = [img_array, labels]
 
@@ -62,9 +60,7 @@ def preprocess(row):
         img_array = cv2.resize(img_array, (256, 256))
 
         multilabels = label.split("|")
-        labels = []
-        for label in multilabels:
-            labels.append(CATEGORIES.index(label))
+        labels = [label for label in multilabels]
 
         testing_data = [img_array, labels]
 
@@ -76,12 +72,8 @@ def main():
 
     print("Combining outputs...")
 
-    training_data_total = []
-    testing_data_total = []
-
-    for result in results:
-        training_data_total.append(result[0])
-        testing_data_total.append(result[1])
+    training_data_total = [result[0] for result in results]
+    testing_data_total = [result[1] for result in results]
 
     training_data_total = [x for x in training_data_total if x != []]
     testing_data_total = [x for x in testing_data_total if x != []]
@@ -89,18 +81,10 @@ def main():
     random.shuffle(training_data_total)
     random.shuffle(testing_data_total)
 
-    X_train = []
-    y_train = []
-    X_test = []
-    y_test = []
-
-    for item in training_data_total:
-        X_train.append(item[0])
-        y_train.append(item[1])
-
-    for item in testing_data_total:
-        X_test.append(item[0])
-        y_test.append(item[1])
+    X_train = [item[0] for item in training_data_total]
+    y_train = [item[1] for item in training_data_total]
+    X_test = [item[0] for item in testing_data_total]
+    y_test = [item[1] for item in testing_data_total]
 
     X_train = np.array(X_train).reshape(-1, 256, 256, 1)
     X_test = np.array(X_test).reshape(-1, 256, 256, 1)
