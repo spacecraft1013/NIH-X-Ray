@@ -29,7 +29,7 @@ densenet = keras.applications.DenseNet201(input_shape=(128, 128, 1), weights=Non
 # best_model = tuner.get_best_models(1)[0]
 # print(best_model.summary())
 
-densenet.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+densenet.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
 log_dir = "data/logs/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
