@@ -9,7 +9,7 @@ import time
 import copy
 import ray
 
-model_save_name = "pytorch_model"
+model_save_name = "densenet201_pytorch"
 epochs = 250
 image_size = 128
 
@@ -41,7 +41,7 @@ model.cuda()
 
 loss_fn = nn.MultiLabelMarginLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=1e-6, momentum=0.9)
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', verbose=True)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
 
 X_train = torch.Tensor(X_train).cuda()
 y_train = torch.Tensor(y_train).cuda()
@@ -94,7 +94,7 @@ for epoch in range(epochs):
             running_loss += loss.item() * inputs.size(0)
             running_corrects += sum(1 for x in zip(outputs[0], labels[0]) if x[0] == x[1])
 
-            print(f"Accuracy: {running_corrects/(len(dataloader[phase])/15)}% Loss: {running_loss/len(dataloader[phase])}", end='\r')
+            print(f"Accuracy: {running_corrects/(index/15)}% Loss: {running_loss/index}", end='\r')
 
         if phase == 'Train':
             scheduler.step(loss)
@@ -111,3 +111,5 @@ time_elapsed = time.time() - starttime
 print(f"Training complete in {time_elapsed // 60}m {time_elapsed % 60}s")
 print('\nBest val Acc: {:4f}'.format(best_acc))
 model.load_state_dict(best_model_wts)
+print("Saving model")
+torch.save(model.state_dict(), f"data/models/{model_save_name}_weights.pth")
