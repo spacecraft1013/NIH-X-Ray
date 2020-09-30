@@ -12,6 +12,7 @@ model_save_name = "densenet201_pytorch"
 epochs = 250
 image_size = 256
 batch_size = 32
+checkpoint_dir = f"data/checkpoints/{model_save_name}/{time.asctime(time.localtime(time.time())).replace(' ', '_')}"
 
 if os.path.exists(f"data/arrays/X_train_{image_size}.npy") == False:
     preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data", image_size=image_size)
@@ -137,6 +138,10 @@ for epoch in range(epochs+1):
     if val_acc > best_acc:
         best_acc = val_acc
         best_model_wts = copy.deepcopy(model.state_dict())
+
+    torch.save(model.state_dict(), os.path.join(checkpoint_dir, f"checkpoint-{epoch:03d}.pth"))
+    print(f"Checkpoint saved to checkpoint-{epoch:03d}.pth")
+
 time_elapsed = time.time() - starttime
 print(f"Training complete in {time_elapsed // 60}m {time_elapsed % 60}s")
 
