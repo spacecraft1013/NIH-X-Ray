@@ -1,5 +1,7 @@
 import numpy as np
 import os
+
+from pandas._config import config
 from multithreaded_preprocessing import PreprocessImages
 import torch
 from torch.utils.data import TensorDataset, DataLoader
@@ -7,11 +9,12 @@ import torch.nn as nn
 from torch.cuda.amp import autocast, GradScaler
 import time
 import copy
-import ray
+from ray import tune
 
 model_save_name = "densenet201_pytorch"
 epochs = 250
-image_size = 128
+image_size = 256
+batch_size = 32
 
 if os.path.exists(f"data/arrays/X_train_{image_size}.npy") == False:
     preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data", image_size=image_size)
@@ -37,23 +40,23 @@ model.features[0] = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=
 model.classifier = nn.Linear(in_features=1920, out_features=15, bias=True)
 
 # model = model_pytorch.Model()
-model.cuda()
+model.to(device)
 
 loss_fn = nn.MultiLabelMarginLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=1e-6, momentum=0.9)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
 
-X_train = torch.Tensor(X_train).cuda()
-y_train = torch.Tensor(y_train).cuda()
-X_test = torch.Tensor(X_test).cuda()
-y_test = torch.Tensor(y_test).cuda()
+X_train = torch.Tensor(X_train)
+y_train = torch.Tensor(y_train)
+X_test = torch.Tensor(X_test)
+y_test = torch.Tensor(y_test)
 
-traindataset = TensorDataset(X_train, y_train)
-traindata = DataLoader(traindataset, shuffle=True)
-valdataset = TensorDataset(X_test, y_test)
-valdata = DataLoader(valdataset, shuffle=True)
-
-dataloader = {'Train': traindata, 'Val': valdata}
+dataset = TensorDataset(X_train, y_train)
+train_set, val_set = torch.utils.data.random_split(dataset, [70000, 16524])
+test_set = TensorDataset(X_test, y_test)
+traindata = DataLoader(train_set, shuffle=True, pin_memory=True, batch_size=batch_size)
+valdata = DataLoader(val_set, shuffle=True, pin_memory=True, batch_size=batch_size)
+testdata = DataLoader(test_set, shuffle=True, pin_memory=True, batch_size=batch_size)
 
 starttime = time.time()
 
@@ -61,55 +64,121 @@ best_model_wts = copy.deepcopy(model.state_dict())
 best_acc = 0.0
 
 scaler = GradScaler()
-
-for epoch in range(epochs):
-    print(f"Epoch {epoch+1}/{epochs}")
-    print('='*50)
-
-    for phase in ['Train', 'Val']:
-        if phase == 'Train':
-            model.train()
-        else:
-            model.eval()
+def train(config):
+    for epoch in range(epochs+1):
+        print(f"Epoch {epoch+1}/{epochs}")
+        print('='*61)
 
         running_loss = 0.0
         running_corrects = 0
 
-        for index, data in enumerate(dataloader[phase]):
+        for index, data in enumerate(traindata):
             inputs, labels = data
-            print(f"{index}/{len(dataloader[phase])}", end=' ')
+            inputs, labels = inputs.to(device), labels.to(device)
+            print(f"{index+1}/{len(traindata)}", end=' ')
 
+            model.train()
             optimizer.zero_grad()
 
-            with torch.set_grad_enabled(phase == 'Train'):
+            with torch.set_grad_enabled(True):
+                with autocast():
+                    outputs = model(inputs)
+                    loss = loss_fn(outputs, labels.long())
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            
+            running_loss += loss.item() * inputs.size(0)
+            listcorrect = []
+            for x in zip(outputs[0], labels[0]):
+                if round(float(x[0])) == x[1]:
+                    listcorrect.append(1)
+                else:
+                    listcorrect.append(0)
+
+            if sum(listcorrect) == 15:
+                running_corrects += 1
+
+            print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1)/15:.2f}% Loss: {running_loss/(index+1)}", end='\r')
+
+            scheduler.step(loss)
+
+        epoch_loss = running_loss / len(traindata)
+        epoch_acc = running_corrects / len(traindata)
+        print(f'\nTraining\nLoss: {epoch_loss}\nAccuracy: {epoch_acc}')
+
+        running_loss = 0.0
+        running_corrects = 0
+
+        model.eval()
+
+        for index, data in enumerate(valdata):
+            inputs, labels = data
+            inputs, labels = inputs.to(device), labels.to(device)
+            print(f"{index+1}/{len(valdata)}", end=' ')
+
+            with torch.no_grad():
                 with autocast():
                     outputs = model(inputs)
                     loss = loss_fn(outputs, labels.long())
 
-                if phase == 'Train':
-                    scaler.scale(loss).backward()
-                    scaler.step(optimizer)
-                    scaler.update()
-            
             running_loss += loss.item() * inputs.size(0)
-            running_corrects += sum(1 for x in zip(outputs[0], labels[0]) if x[0] == x[1])
+            listcorrect = []
+            for x in zip(outputs[0], labels[0]):
+                if round(float(x[0])) == x[1]:
+                    listcorrect.append(1)
+                else:
+                    listcorrect.append(0)
 
-            print(f"Accuracy: {running_corrects/(index/15)}% Loss: {running_loss/index}", end='\r')
+            if sum(listcorrect) == 15:
+                running_corrects += 1
 
-        if phase == 'Train':
-            scheduler.step(loss)
+            print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1)/15:.2f}% Loss: {running_loss/(index+1)}", end='\r')
 
-        epoch_loss = running_loss / len(dataloader[phase])
-        epoch_acc = running_corrects / len(dataloader[phase])
-        print(f'{phase}\nLoss: {epoch_loss}\nAccuracy: {epoch_acc}')
+        val_loss = running_loss / len(valdata)
+        val_acc = running_corrects / len(valdata)
+        print(f'\nValidation\nLoss: {val_loss}\nAccuracy: {val_acc}')
 
-        if phase == 'Val' and epoch_acc > best_acc:
-                best_acc = epoch_acc
-                best_model_wts = copy.deepcopy(model.state_dict())
+        with tune.checkpoint_dir(epoch) as checkpoint_dir:
+            path = os.path.join(checkpoint_dir, "checkpoint")
+            torch.save((model.state_dict(), optimizer.state_dict()), path)
+        tune.report(loss=val_loss, accuracy=val_acc)
 
-time_elapsed = time.time() - starttime
-print(f"Training complete in {time_elapsed // 60}m {time_elapsed % 60}s")
-print('\nBest val Acc: {:4f}'.format(best_acc))
-model.load_state_dict(best_model_wts)
+        if val_acc > best_acc:
+            best_acc = val_acc
+            best_model_wts = copy.deepcopy(model.state_dict())
+    time_elapsed = time.time() - starttime
+    print(f"Training complete in {time_elapsed // 60}m {time_elapsed % 60}s")
+
+analysis = tune.run(train, num_samples=10, resources_per_trial={"gpu": 1})
+print("Best config: ", analysis.get_best_config(metric="accuracy", mode="max"))
+
+
+model.eval()
+running_loss = 0.0
+running_corrects = 0
+for index, data in enumerate(testdata):
+    inputs, labels = data
+    inputs, labels = inputs.to(device), labels.to(device)
+    print(f"{index+1}/{len(valdata)}", end=' ')
+    with torch.no_grad():
+        with autocast():
+            outputs = model(inputs)
+            loss = loss_fn(outputs, labels.long())
+    
+    running_loss += loss.item() * inputs.size(0)
+    listcorrect = []
+    for x in zip(outputs[0], labels[0]):
+        if round(float(x[0])) == x[1]:
+            listcorrect.append(1)
+        else:
+            listcorrect.append(0)
+    if sum(listcorrect) == 15:
+        running_corrects += 1
+    print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1)/15:.2f}% Loss: {running_loss/(index+1)}", end='\r')
+test_loss = running_loss / len(testdata)
+test_acc = running_corrects / len(testdata)
+print(f'\nTesting\nLoss: {test_loss}\nAccuracy: {test_acc}')
+
 print("Saving model")
 torch.save(model.state_dict(), f"data/models/{model_save_name}_weights.pth")
