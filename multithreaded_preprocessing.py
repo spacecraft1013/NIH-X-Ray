@@ -44,6 +44,9 @@ class PreprocessImages():
         self.dataset_dir = dataset_dir
         self.csv_data, self.train_list, self.test_list = self.load_initial_data()
 
+    def __call__(self):
+        self.start()
+
     def load_initial_data(self):
         """
         Loads the initial data needed for preprocessing
@@ -95,7 +98,7 @@ class PreprocessImages():
 
         if imagename in self.train_list:
             print("Training data: ", imagename)
-            imagepath = self.findimage(imagename, self.datasetdir)
+            imagepath = self.findimage(imagename, self.dataset_dir)
             
             img_array = cv2.imread(imagepath, cv2.IMREAD_GRAYSCALE)
             img_array = cv2.resize(img_array, (self.image_size, self.image_size))
@@ -107,7 +110,7 @@ class PreprocessImages():
 
         elif imagename in self.test_list:
             print("Testing data: ", imagename)
-            imagepath = self.findimage(imagename, self.datasetdir)
+            imagepath = self.findimage(imagename, self.dataset_dir)
             
             img_array = cv2.imread(imagepath, cv2.IMREAD_GRAYSCALE)
             img_array = cv2.resize(img_array, (self.image_size, self.image_size))
@@ -158,4 +161,4 @@ class PreprocessImages():
 
 if __name__ == "__main__":
     preprocessor = PreprocessImages()
-    preprocessor.start()
+    preprocessor()
