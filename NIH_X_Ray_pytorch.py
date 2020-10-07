@@ -12,11 +12,16 @@ model_save_name = "densenet201_pytorch"
 epochs = 250
 image_size = 256
 batch_size = 32
-checkpoint_dir = f"data/checkpoints/{model_save_name}/{time.asctime(time.localtime(time.time())).replace(' ', '_')}"
+checkpoint_dir = f"data/checkpoints/{model_save_name}/{time.asctime(time.localtime(time.time())).replace(' ', '_').replace(':', '_')}/"
+try:
+    os.mkdir(checkpoint_dir)
+except OSError:
+    os.mkdir(f"data/checkpoints/{model_save_name}")
+    os.mkdir(checkpoint_dir)
 
 if os.path.exists(f"data/arrays/X_train_{image_size}.npy") == False:
     preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data", image_size=image_size)
-    preprocessor.start()
+    preprocessor()
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
@@ -96,13 +101,13 @@ for epoch in range(epochs+1):
         if sum(listcorrect) == 15:
             running_corrects += 1
 
-        print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1)/15:.2f}% Loss: {running_loss/(index+1)}", end='\r')
+        print(f"Correct: {running_corrects} Accuracy: {(running_corrects/(index+1))*100:.2f}% Loss: {running_loss/(index+1)}", end='\r')
 
         scheduler.step(loss)
 
     epoch_loss = running_loss / len(traindata)
     epoch_acc = running_corrects / len(traindata)
-    print(f'\nTraining\nLoss: {epoch_loss}\nAccuracy: {epoch_acc}')
+    print(f'\nTraining\nLoss: {epoch_loss}\nAccuracy: {epoch_acc*100}%')
 
     running_loss = 0.0
     running_corrects = 0
@@ -129,11 +134,11 @@ for epoch in range(epochs+1):
         if sum(listcorrect) == 15:
             running_corrects += 1
 
-        print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1)/15:.2f}% Loss: {running_loss/(index+1)}", end='\r')
+        print(f"Correct: {running_corrects} Accuracy: {(running_corrects/(index+1))*100:.2f}% Loss: {running_loss/(index+1)}", end='\r')
 
     val_loss = running_loss / len(valdata)
     val_acc = running_corrects / len(valdata)
-    print(f'\nValidation\nLoss: {val_loss}\nAccuracy: {val_acc}')
+    print(f'\nValidation\nLoss: {val_loss}\nAccuracy: {val_acc*100}%')
 
     if val_acc > best_acc:
         best_acc = val_acc
@@ -166,10 +171,10 @@ for index, data in enumerate(testdata):
             listcorrect.append(0)
     if sum(listcorrect) == 15:
         running_corrects += 1
-    print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1)/15:.2f}% Loss: {running_loss/(index+1)}", end='\r')
+    print(f"Correct: {running_corrects} Accuracy: {(running_corrects/(index+1))*100:.2f}% Loss: {running_loss/(index+1)}", end='\r')
 test_loss = running_loss / len(testdata)
 test_acc = running_corrects / len(testdata)
-print(f'\nTesting\nLoss: {test_loss}\nAccuracy: {test_acc}')
+print(f'\nTesting\nLoss: {test_loss}\nAccuracy: {test_acc*100}%')
 
 print("Saving model")
 torch.save(model.state_dict(), f"data/models/{model_save_name}_weights.pth")
