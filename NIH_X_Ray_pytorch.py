@@ -101,13 +101,13 @@ for epoch in range(epochs+1):
         if sum(listcorrect) == 15:
             running_corrects += 1
 
-        print(f"Correct: {running_corrects} Accuracy: {(running_corrects/(index+1))*100:.2f}% Loss: {running_loss/(index+1)}", end='\r')
+        print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1):.2%} Loss: {running_loss/(index+1)}", end='\r')
 
         scheduler.step(loss)
 
     epoch_loss = running_loss / len(traindata)
     epoch_acc = running_corrects / len(traindata)
-    print(f'\nTraining\nLoss: {epoch_loss}\nAccuracy: {epoch_acc*100}%')
+    print(f'\nTraining\nLoss: {epoch_loss}\nAccuracy: {epoch_acc:.2%}')
 
     running_loss = 0.0
     running_corrects = 0
@@ -134,11 +134,11 @@ for epoch in range(epochs+1):
         if sum(listcorrect) == 15:
             running_corrects += 1
 
-        print(f"Correct: {running_corrects} Accuracy: {(running_corrects/(index+1))*100:.2f}% Loss: {running_loss/(index+1)}", end='\r')
+        print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1):.2%} Loss: {running_loss/(index+1)}", end='\r')
 
     val_loss = running_loss / len(valdata)
     val_acc = running_corrects / len(valdata)
-    print(f'\nValidation\nLoss: {val_loss}\nAccuracy: {val_acc*100}%')
+    print(f'\nValidation\nLoss: {val_loss}\nAccuracy: {val_acc:.2%}')
 
     if val_acc > best_acc:
         best_acc = val_acc
@@ -171,10 +171,10 @@ for index, data in enumerate(testdata):
             listcorrect.append(0)
     if sum(listcorrect) == 15:
         running_corrects += 1
-    print(f"Correct: {running_corrects} Accuracy: {(running_corrects/(index+1))*100:.2f}% Loss: {running_loss/(index+1)}", end='\r')
+    print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1):.2%}% Loss: {running_loss/(index+1)}", end='\r')
 test_loss = running_loss / len(testdata)
 test_acc = running_corrects / len(testdata)
-print(f'\nTesting\nLoss: {test_loss}\nAccuracy: {test_acc*100}%')
+print(f'\nTesting\nLoss: {test_loss}\nAccuracy: {test_acc:.2%}%')
 
 print("Saving model")
 torch.save(model.state_dict(), f"data/models/{model_save_name}_weights.pth")
