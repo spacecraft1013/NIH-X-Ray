@@ -1,7 +1,5 @@
 import numpy as np
 import os
-
-from pandas._config import config
 from multithreaded_preprocessing import PreprocessImages
 import torch
 from torch.utils.data import TensorDataset, DataLoader
@@ -99,7 +97,7 @@ def train(config):
             if sum(listcorrect) == 15:
                 running_corrects += 1
 
-            print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1)/15:.2f}% Loss: {running_loss/(index+1)}", end='\r')
+            print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1):.2%} Loss: {running_loss/(index+1)}", end='\r')
 
             scheduler.step(loss)
 
@@ -133,7 +131,7 @@ def train(config):
             if sum(listcorrect) == 15:
                 running_corrects += 1
 
-            print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1)/15:.2f}% Loss: {running_loss/(index+1)}", end='\r')
+            print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1):.2%} Loss: {running_loss/(index+1)}", end='\r')
 
         val_loss = running_loss / len(valdata)
         val_acc = running_corrects / len(valdata)
@@ -175,7 +173,7 @@ for index, data in enumerate(testdata):
             listcorrect.append(0)
     if sum(listcorrect) == 15:
         running_corrects += 1
-    print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1)/15:.2f}% Loss: {running_loss/(index+1)}", end='\r')
+    print(f"Correct: {running_corrects} Accuracy: {running_corrects/(index+1):.2%} Loss: {running_loss/(index+1)}", end='\r')
 test_loss = running_loss / len(testdata)
 test_acc = running_corrects / len(testdata)
 print(f'\nTesting\nLoss: {test_loss}\nAccuracy: {test_acc}')

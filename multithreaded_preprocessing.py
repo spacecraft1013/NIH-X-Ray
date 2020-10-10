@@ -95,7 +95,7 @@ class PreprocessImages():
 
         if imagename in self.train_list:
             print("Training data: ", imagename)
-            imagepath = self.findimage(imagename, self.datasetdir)
+            imagepath = self.findimage(imagename, self.dataset_dir)
             
             img_array = cv2.imread(imagepath, cv2.IMREAD_GRAYSCALE)
             img_array = cv2.resize(img_array, (self.image_size, self.image_size))
@@ -107,7 +107,7 @@ class PreprocessImages():
 
         elif imagename in self.test_list:
             print("Testing data: ", imagename)
-            imagepath = self.findimage(imagename, self.datasetdir)
+            imagepath = self.findimage(imagename, self.dataset_dir)
             
             img_array = cv2.imread(imagepath, cv2.IMREAD_GRAYSCALE)
             img_array = cv2.resize(img_array, (self.image_size, self.image_size))
