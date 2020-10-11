@@ -45,7 +45,8 @@ class PreprocessImages():
         self.csv_data, self.train_list, self.test_list = self.load_initial_data()
 
     def __call__(self):
-        self.start()
+        """Calls self.start()"""
+        return self.start()
 
     def load_initial_data(self):
         """
@@ -158,6 +159,8 @@ class PreprocessImages():
         np.save(f"data/arrays/y_train_{self.image_size}.npy", y_train)
         np.save(f"data/arrays/X_test_{self.image_size}.npy", X_test)
         np.save(f"data/arrays/y_test_{self.image_size}.npy", y_test)
+
+        return (X_train, y_train), (X_test, y_test)
 
 if __name__ == "__main__":
     preprocessor = PreprocessImages()

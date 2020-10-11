@@ -19,9 +19,6 @@ except OSError:
     os.mkdir(f"data/checkpoints/{model_save_name}")
     os.mkdir(checkpoint_dir)
 
-if os.path.exists(f"data/arrays/X_train_{image_size}.npy") == False:
-    preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data", image_size=image_size)
-    preprocessor()
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
@@ -30,10 +27,16 @@ else:
     device = torch.device('cpu')
 
 print("Importing Arrays")
-X_train = np.load(open(f"data/arrays/X_train_{image_size}.npy", "rb"))
-y_train = np.load(open(f"data/arrays/y_train_{image_size}.npy", "rb"))
-X_test = np.load(open(f"data/arrays/X_test_{image_size}.npy", "rb"))
-y_test = np.load(open(f"data/arrays/y_test_{image_size}.npy", "rb"))
+if os.path.exists(f"data/arrays/X_train_{image_size}.npy") == False:
+    print("Arrays not found, generating...")
+    preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data", image_size)
+    (X_train, y_train), (X_test, y_test) = preprocessor()
+
+else:
+    X_train = np.load(open(f"data/arrays/X_train_{image_size}.npy", "rb"))
+    y_train = np.load(open(f"data/arrays/y_train_{image_size}.npy", "rb"))
+    X_test = np.load(open(f"data/arrays/X_test_{image_size}.npy", "rb"))
+    y_test = np.load(open(f"data/arrays/y_test_{image_size}.npy", "rb"))
 
 X_train = np.transpose(X_train, (0, 3, 1, 2))
 X_test = np.transpose(X_test, (0, 3, 1, 2))
