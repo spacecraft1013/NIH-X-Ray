@@ -12,7 +12,6 @@ CATEGORIES = ["No Finding", "Atelectasis", "Cardiomegaly", "Effusion", "Infiltra
 class PreprocessImages():
     """
     A class for preprocessing images from the NIH ChestX-ray14 Dataset. Dataset can be downloaded at https://www.kaggle.com/nih-chest-xrays/data.
-
     Attributes
     ----------
     image_size : int
@@ -25,7 +24,6 @@ class PreprocessImages():
         Contents of the train_val_list.txt file in the dataset
     test_list : str
         Contents of the test_list.txt file in the dataset
-
     Methods
     -------
     start()
@@ -44,10 +42,13 @@ class PreprocessImages():
         self.dataset_dir = dataset_dir
         self.csv_data, self.train_list, self.test_list = self.load_initial_data()
 
+    def __call__(self):
+        """Calls self.start()"""
+        return self.start()
+
     def load_initial_data(self):
         """
         Loads the initial data needed for preprocessing
-
         Returns
         -------
         csv_data : pd.DataFrame
@@ -156,6 +157,8 @@ class PreprocessImages():
         np.save(f"data/arrays/X_test_{self.image_size}.npy", X_test)
         np.save(f"data/arrays/y_test_{self.image_size}.npy", y_test)
 
+        return (X_train, y_train), (X_test, y_test)
+
 if __name__ == "__main__":
     preprocessor = PreprocessImages()
-    preprocessor.start()
+    preprocessor()

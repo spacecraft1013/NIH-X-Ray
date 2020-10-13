@@ -6,7 +6,6 @@ from torch.utils.data import TensorDataset, DataLoader
 import torch.nn as nn
 from torch.cuda.amp import autocast, GradScaler
 import time
-import copy
 from ray import tune
 
 model_save_name = "densenet201_pytorch"
@@ -16,7 +15,7 @@ batch_size = 32
 
 if os.path.exists(f"data/arrays/X_train_{image_size}.npy") == False:
     preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data", image_size=image_size)
-    preprocessor.start()
+    preprocessor()
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
@@ -58,11 +57,10 @@ testdata = DataLoader(test_set, shuffle=True, pin_memory=True, batch_size=batch_
 
 starttime = time.time()
 
-best_model_wts = copy.deepcopy(model.state_dict())
 best_acc = 0.0
 
 scaler = GradScaler()
-def train(config):
+def train(config, checkpoint_dir=None):
     for epoch in range(epochs+1):
         print(f"Epoch {epoch+1}/{epochs}")
         print('='*61)
@@ -142,13 +140,10 @@ def train(config):
             torch.save((model.state_dict(), optimizer.state_dict()), path)
         tune.report(loss=val_loss, accuracy=val_acc)
 
-        if val_acc > best_acc:
-            best_acc = val_acc
-            best_model_wts = copy.deepcopy(model.state_dict())
     time_elapsed = time.time() - starttime
     print(f"Training complete in {time_elapsed // 60}m {time_elapsed % 60}s")
 
-analysis = tune.run(train, num_samples=10, resources_per_trial={"gpu": 1})
+analysis = tune.run(train, num_samples=10, resources_per_trial={"cpu": os.cpu_count()/torch.cuda.device_count(),"gpu": 1})
 print("Best config: ", analysis.get_best_config(metric="accuracy", mode="max"))
 
 
