@@ -27,7 +27,7 @@ else:
     device = torch.device('cpu')
 
 print("Importing Arrays")
-if os.path.exists(f"data/arrays/X_train_{image_size}.npy") == False:
+if not os.path.exists(f"data/arrays/X_train_{image_size}.npy"):
     print("Arrays not found, generating...")
     preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data", image_size)
     (X_train, y_train), (X_test, y_test) = preprocessor()
@@ -45,7 +45,6 @@ model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet201', pretrained=False)
 model.features[0] = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
 model.classifier = nn.Linear(in_features=1920, out_features=15, bias=True)
 
-# model = model_pytorch.Model()
 model.to(device)
 
 loss_fn = nn.MultiLabelMarginLoss()
@@ -92,7 +91,7 @@ for epoch in range(epochs+1):
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-        
+
         running_loss += loss.item() * inputs.size(0)
         listcorrect = []
         for x in zip(outputs[0], labels[0]):
@@ -164,7 +163,7 @@ for index, data in enumerate(testdata):
         with autocast():
             outputs = model(inputs)
             loss = loss_fn(outputs, labels.long())
-    
+
     running_loss += loss.item() * inputs.size(0)
     listcorrect = []
     for x in zip(outputs[0], labels[0]):

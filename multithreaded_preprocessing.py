@@ -9,7 +9,7 @@ import time
 
 CATEGORIES = ["No Finding", "Atelectasis", "Cardiomegaly", "Effusion", "Infiltration", "Mass", "Nodule", "Pneumonia", "Pneumothorax", "Consolidation", "Edema", "Emphysema", "Fibrosis", "Pleural_Thickening", "Hernia"]
 
-class PreprocessImages():
+class PreprocessImages:
     """
     A class for preprocessing images from the NIH ChestX-ray14 Dataset. Dataset can be downloaded at https://www.kaggle.com/nih-chest-xrays/data.
 
