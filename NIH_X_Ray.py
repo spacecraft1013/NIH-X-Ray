@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import numpy as np
 import keras
 import datetime
@@ -10,15 +9,17 @@ epochs = 250
 image_size = 256
 batch_size = 32
 
-if os.path.exists("data/arrays/X_train_256.npy") == False:
-    preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data", image_size=image_size)
-    preprocessor()
-
 print("Importing Arrays")
-X_train = np.load(open(f"data/arrays/X_train_{image_size}.npy", "rb"))
-y_train = np.load(open(f"data/arrays/y_train_{image_size}.npy", "rb"))
-X_test = np.load(open(f"data/arrays/X_test_{image_size}.npy", "rb"))
-y_test = np.load(open(f"data/arrays/y_test_{image_size}.npy", "rb"))
+if not os.path.exists(f"data/arrays/X_train_{image_size}.npy"):
+    print("Arrays not found, generating...")
+    preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data", image_size)
+    (X_train, y_train), (X_test, y_test) = preprocessor()
+
+else:
+    X_train = np.load(open(f"data/arrays/X_train_{image_size}.npy", "rb"))
+    y_train = np.load(open(f"data/arrays/y_train_{image_size}.npy", "rb"))
+    X_test = np.load(open(f"data/arrays/X_test_{image_size}.npy", "rb"))
+    y_test = np.load(open(f"data/arrays/y_test_{image_size}.npy", "rb"))
 
 # tuner = kt.BayesianOptimization(model_generator, objective='val_accuracy', max_trials=500, project_name="NIH X-Ray Model")
 
