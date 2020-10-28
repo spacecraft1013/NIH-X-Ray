@@ -81,6 +81,7 @@ for epoch in range(epochs+1):
     running_loss = 0.0
 
     for index, data in enumerate(traindata):
+        startstep = time.time()
         inputs, labels = data
         inputs, labels = inputs.to(device), labels.to(device)
         print(f"{index+1}/{len(traindata)}", end=' ')
@@ -98,9 +99,10 @@ for epoch in range(epochs+1):
 
         running_loss += loss.item() * inputs.size(0)
 
-        print(f"Loss: {running_loss/(index+1)}", end='\r')
+        print(f"Training: {(time.time() - startstep)*1000:.2f}ms/step, Loss: {running_loss/(index+1)}", end='\r')
 
         scheduler.step(loss)
+    print()
 
     epoch_loss = running_loss / len(traindata)
 
@@ -109,6 +111,7 @@ for epoch in range(epochs+1):
     model.eval()
     y_pred = []
     for index, data in enumerate(valdata):
+        startstep = time.time()
         inputs, labels = data
         inputs, labels = inputs.to(device), labels.to(device)
         print(f"{index+1}/{len(valdata)}", end=' ')
@@ -122,7 +125,8 @@ for epoch in range(epochs+1):
 
         running_loss += loss.item() * inputs.size(0)
 
-        print(f"Loss: {running_loss/(index+1)}", end='\r')
+        print(f"Validation: {(time.time() - startstep)*1000:.2f}ms/step, Loss: {running_loss/(index+1)}", end='\r')
+    print()
 
     val_loss = running_loss / len(valdata)
 
@@ -143,6 +147,7 @@ model.eval()
 running_loss = 0.0
 y_pred = []
 for index, data in enumerate(testdata):
+    startstep = time.time()
     inputs, labels = data
     inputs, labels = inputs.to(device), labels.to(device)
     print(f"{index+1}/{len(valdata)}", end=' ')
@@ -156,7 +161,8 @@ for index, data in enumerate(testdata):
 
     running_loss += loss.item() * inputs.size(0)
 
-    print(f"Loss: {running_loss/(index+1)}", end='\r')
+    print(f"Testing: {(time.time() - startstep)*1000:.2f}ms/step, Loss: {running_loss/(index+1)}", end='\r')
+print()
 
 test_loss = running_loss / len(testdata)
 
