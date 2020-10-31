@@ -3,6 +3,7 @@ import os
 import time
 
 import numpy as np
+import onnx
 import torch
 import torch.nn as nn
 from torch.cuda.amp import GradScaler, autocast
@@ -11,18 +12,13 @@ from torch.utils.data import DataLoader, TensorDataset
 from multithreaded_preprocessing import PreprocessImages
 
 model_save_name = "densenet201_pytorch"
-current_time = time.asctime(time.localtime(time.time())).replace(' ', '_').replace(':', '_')
 epochs = 250
 image_size = 256
 batch_size = 32
-checkpoint_dir = f"data/checkpoints/{model_save_name}/{current_time}/"
+checkpoint_dir = f"data/checkpoints/{model_save_name}/"
 
-try:
+if not os.path.exists(checkpoint_dir):
     os.mkdir(checkpoint_dir)
-except OSError:
-    os.mkdir(f"data/checkpoints/{model_save_name}")
-    os.mkdir(checkpoint_dir)
-
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
@@ -166,5 +162,12 @@ print()
 
 test_loss = running_loss / len(testdata)
 
-print("Saving model")
+print("Saving model weights")
 torch.save(model.state_dict(), f"data/models/{model_save_name}_weights.pth")
+print("Model saved!")
+
+print("Saving ONNX file")
+dummy_input = torch.randn(1, 1, image_size, image_size, device='cuda')
+torch.onnx.export(model, dummy_input, f"data/models/{model_save_name}.onnx", verbose=True)
+onnx.checker.check_model(f'data/models/{model_save_name}.onnx')
+print("ONNX model has been successfully saved!")
