@@ -134,7 +134,7 @@ for epoch in range(epochs+1):
         best_model_wts = copy.deepcopy(model.state_dict())
 
     torch.save(model.state_dict(), os.path.join(checkpoint_dir, f"checkpoint-{epoch:03d}.pth"))
-    print(f"Checkpoint saved to checkpoint-{epoch:03d}.pth")
+    print(f"Checkpoint saved to checkpoint-{epoch:03d}.pth\n")
 
 time_elapsed = time.time() - starttime
 print(f"Training complete in {time_elapsed // 60}m {time_elapsed % 60}s")
@@ -164,7 +164,7 @@ test_loss = running_loss / len(testdata)
 
 print("Saving model weights")
 torch.save(model.state_dict(), f"data/models/{model_save_name}_weights.pth")
-print("Model saved!")
+print("Model saved!\n")
 
 print("Saving ONNX file")
 dummy_input = torch.randn(1, 1, image_size, image_size, device='cuda')
