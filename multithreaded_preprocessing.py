@@ -1,11 +1,12 @@
-import cv2
-import pandas as pd
+import multiprocessing as mp
 import os
 import random
-import numpy as np
-import multiprocessing as mp
-from sklearn.preprocessing import MultiLabelBinarizer
 import time
+
+import cv2
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import MultiLabelBinarizer
 
 CATEGORIES = ["No Finding", "Atelectasis", "Cardiomegaly", "Effusion", "Infiltration", "Mass", "Nodule", "Pneumonia", "Pneumothorax", "Consolidation", "Edema", "Emphysema", "Fibrosis", "Pleural_Thickening", "Hernia"]
 
@@ -36,19 +37,19 @@ class PreprocessImages:
         Preprocesses a single row of the csv_data dataframe
     """
 
-    def __init__(self, dataset_dir, image_size=256):
+    def __init__(self, dataset_dir: str, image_size:int=256):
         """
         Constructs the image_size and dataset_dir attributes and runs load_initial_data()
         """
         self.image_size = image_size
         self.dataset_dir = dataset_dir
-        self.csv_data, self.train_list, self.test_list = self.load_initial_data()
+        self.csv_data, self.train_list, self.test_list = self._load_initial_data()
 
     def __call__(self):
         """Calls self.start()"""
         return self.start()
 
-    def load_initial_data(self):
+    def _load_initial_data(self):
         """
         Loads the initial data needed for preprocessing
 
@@ -69,12 +70,12 @@ class PreprocessImages:
             test_list = test_list_file.read()
         return csv_data, train_list, test_list
 
-    def findimage(self, name, path):
+    def _findimage(self, name, path):
         for root, dirs, files in os.walk(path):
             if name in files:
                 return os.path.join(root, name)
 
-    def preprocess(self, row):
+    def _preprocess(self, row):
         """
         Preprocesses a single row of data
         
@@ -111,7 +112,7 @@ class PreprocessImages:
 
         elif imagename in self.test_list:
             print("Testing data: ", imagename)
-            imagepath = self.findimage(imagename, self.dataset_dir)
+            imagepath = self._findimage(imagename, self.dataset_dir)
             
             img_array = cv2.imread(imagepath, cv2.IMREAD_GRAYSCALE)
             img_array = cv2.resize(img_array, (self.image_size, self.image_size))
@@ -129,7 +130,7 @@ class PreprocessImages:
         """
         starttime = time.time()
         pool = mp.Pool(mp.cpu_count())
-        results = pool.map(self.preprocess, list(self.csv_data.iterrows()))
+        results = pool.map(self._preprocess, list(self.csv_data.iterrows()))
 
         print("Combining outputs...")
 
