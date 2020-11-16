@@ -1,4 +1,3 @@
-import tensorflow as tf
 import keras
 import pandas
 import glob
@@ -7,10 +6,10 @@ import numpy as np
 X_test = np.load("data/arrays/X_test.npy")
 y_test = np.load("data/arrays/y_test.npy")
 
-data = {"Model":[],
-        "Accuracy":[],
-        "Loss":[],
-        "MAE":[]}
+data = {"Model": [],
+        "Accuracy": [],
+        "Loss": [],
+        "MAE": []}
 
 for file in glob.glob("data/*.h5"):
     print("Testing {}...".format(file.strip(r"data\"")))

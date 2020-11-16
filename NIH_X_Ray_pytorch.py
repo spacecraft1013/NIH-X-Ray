@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader, TensorDataset
+from torch.optim import SGD, lr_scheduler
 
 from multithreaded_preprocessing import PreprocessImages
 
@@ -42,15 +43,17 @@ else:
 X_train = np.transpose(X_train, (0, 3, 1, 2))
 X_test = np.transpose(X_test, (0, 3, 1, 2))
 
-model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet201', pretrained=False)
-model.features[0] = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet201',
+                       pretrained=False)
+model.features[0] = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2),
+                              padding=(3, 3), bias=False)
 model.classifier = nn.Linear(in_features=1920, out_features=15, bias=True)
 
 model.to(device)
 
 loss_fn = nn.MultiLabelMarginLoss().to(device)
-optimizer = torch.optim.SGD(model.parameters(), lr=1e-6, momentum=0.9)
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
+optimizer = SGD(model.parameters(), lr=1e-6, momentum=0.9)
+scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
 
 X_train = torch.Tensor(X_train)
 y_train = torch.Tensor(y_train)
@@ -61,9 +64,12 @@ dataset = TensorDataset(X_train, y_train)
 train_set, val_set = torch.utils.data.random_split(dataset, [70000, 16524])
 val_labels = [label.numpy() for input, label in val_set]
 test_set = TensorDataset(X_test, y_test)
-traindata = DataLoader(train_set, shuffle=True, pin_memory=True, batch_size=batch_size)
-valdata = DataLoader(val_set, shuffle=True, pin_memory=True, batch_size=batch_size)
-testdata = DataLoader(test_set, shuffle=True, pin_memory=True, batch_size=batch_size)
+traindata = DataLoader(train_set, shuffle=True,
+                       pin_memory=True, batch_size=batch_size)
+valdata = DataLoader(val_set, shuffle=True,
+                     pin_memory=True, batch_size=batch_size)
+testdata = DataLoader(test_set, shuffle=True,
+                      pin_memory=True, batch_size=batch_size)
 
 starttime = time.time()
 
@@ -95,7 +101,8 @@ for epoch in range(epochs+1):
 
         running_loss += loss.item() * inputs.size(0)
 
-        print(f"Training: {(time.time() - startstep)*1000:.2f}ms/step, Loss: {running_loss/(index+1)}", end='\r')
+        print(f"Training: {(time.time() - startstep)*1000:.2f}ms/step, \
+              Loss: {running_loss/(index+1)}", end='\r')
 
         scheduler.step(loss)
     print()
@@ -121,7 +128,8 @@ for epoch in range(epochs+1):
 
         running_loss += loss.item() * inputs.size(0)
 
-        print(f"Validation: {(time.time() - startstep)*1000:.2f}ms/step, Loss: {running_loss/(index+1)}", end='\r')
+        print(f"Validation: {(time.time() - startstep)*1000:.2f}ms/step, \
+              Loss: {running_loss/(index+1)}", end='\r')
     print()
 
     val_loss = running_loss / len(valdata)
@@ -133,7 +141,9 @@ for epoch in range(epochs+1):
         best_loss = val_loss
         best_model_wts = copy.deepcopy(model.state_dict())
 
-    torch.save(model.state_dict(), os.path.join(checkpoint_dir, f"checkpoint-{epoch:03d}.pth"))
+    checkpoint_path = os.path.join(checkpoint_dir,
+                                   f"checkpoint-{epoch:03d}.pth")
+    torch.save(model.state_dict(), checkpoint_path)
     print(f"Checkpoint saved to checkpoint-{epoch:03d}.pth\n")
 
 time_elapsed = time.time() - starttime
@@ -158,7 +168,8 @@ for index, data in enumerate(testdata):
 
     running_loss += loss.item() * inputs.size(0)
 
-    print(f"Testing: {(time.time() - startstep)*1000:.2f}ms/step, Loss: {running_loss/(index+1)}", end='\r')
+    print(f"Testing: {(time.time() - startstep)*1000:.2f}ms/step, \
+          Loss: {running_loss/(index+1)}", end='\r')
 print()
 
 test_loss = running_loss / len(testdata)
@@ -167,8 +178,10 @@ print("Saving model weights")
 torch.save(model.state_dict(), f"data/models/{model_save_name}_weights.pth")
 print("Model saved!\n")
 
+
 print("Saving ONNX file")
+onnx_save_path = f"data/models/{model_save_name}.onnx"
 dummy_input = torch.randn(1, 1, image_size, image_size, device='cuda')
-torch.onnx.export(model, dummy_input, f"data/models/{model_save_name}.onnx", verbose=True)
-onnx.checker.check_model(f'data/models/{model_save_name}.onnx')
+torch.onnx.export(model, dummy_input, onnx_save_path, verbose=True)
+onnx.checker.check_model(onnx_save_path)
 print("ONNX model has been successfully saved!")
