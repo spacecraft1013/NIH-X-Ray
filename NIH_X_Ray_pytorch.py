@@ -48,7 +48,7 @@ model.classifier = nn.Linear(in_features=1920, out_features=15, bias=True)
 
 model.to(device)
 
-loss_fn = nn.MultiLabelMarginLoss()
+loss_fn = nn.MultiLabelMarginLoss().to(device)
 optimizer = torch.optim.SGD(model.parameters(), lr=1e-6, momentum=0.9)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
 
@@ -139,6 +139,7 @@ for epoch in range(epochs+1):
 time_elapsed = time.time() - starttime
 print(f"Training complete in {time_elapsed // 60}m {time_elapsed % 60}s")
 
+model.load_state_dict(best_model_wts)
 model.eval()
 running_loss = 0.0
 y_pred = []
