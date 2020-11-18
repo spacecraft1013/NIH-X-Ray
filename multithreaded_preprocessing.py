@@ -42,7 +42,7 @@ class PreprocessImages:
         Preprocesses a single row of the csv_data dataframe
     """
 
-    def __init__(self, dataset_dir: str, image_size: int = 256):
+    def __init__(self, dataset_dir: str, image_size: int = 256, **kwargs):
         """
         Constructs the image_size and dataset_dir attributes and loads data
         """
@@ -87,23 +87,59 @@ class PreprocessImages:
             if name in files:
                 return os.path.join(root, name)
 
-    def _preprocess(self, row):
+    def fourier(self, image: np.ndarray) -> np.ndarray:
+        """Does a Discrete Fourier Transform on the input image
+
+        Args:
+            image (np.ndarray): Input image
+
+        Returns:
+            np.ndarray: Fourier Transformed Image
         """
-        Preprocesses a single row of data
+        dft = cv2.dft(np.float32(image), flags=cv2.DFT_COMPLEX_OUTPUT)
+        dft_shift = np.fft.fftshift(dft)
+        return dft_shift
 
-        Parameters
-        ----------
-        row : list
-            Row of csv data from dataset
+    def edgedetect(self, image: np.ndarray, radius: int = 50) -> np.ndarray:
+        """Runs Fourier edge detection on image
 
-        Returns
-        -------
-        training_data : list
-            If data is in train_list, contains np.ndarray with image data
-            and list of labels
-        testing_data : list
-            If data is in test_list, contains np.ndarray with image data
-            and list of labels
+        Args:
+            image (np.ndarray): Input image
+            radius (int, optional): Radius of mask. Defaults to 50.
+
+        Returns:
+            np.ndarray: Edges of image
+        """
+        rows, cols, _ = image.shape
+        crow, ccol = int(rows / 2), int(cols / 2)
+
+        mask = np.ones((rows, cols, 2), np.uint8)
+
+        center = [crow, ccol]
+
+        x, y = np.ogrid[:rows, :cols]
+        mask_area = (x - center[0]) ** 2 + (y - center[1]) ** 2 <= radius**2
+        mask[mask_area] = 0
+
+        dft_shift = self.fourier(image)
+        fshift = dft_shift * mask
+
+        f_ishift = np.fft.ifftshift(fshift)
+        reversed = cv2.idft(f_ishift)
+        output = cv2.magnitude(reversed[:, :, 0], reversed[:, :, 1])
+        return output
+
+    def _preprocess(self, row: list) -> tuple:
+        """Preprocesses a single row of data
+
+        Args:
+            row (list): Row of Pandas dataframe
+
+        Returns:
+            training_data: If data is in train_list, contains np.ndarray
+                with image data and list of labels
+            testing_data: If data is in test_list, contains np.ndarray
+                with image data and list of labels
         """
         row = row[1]
         imagename = row['Image Index']
@@ -144,16 +180,13 @@ class PreprocessImages:
         """
         Starts the multithreaded preprocessing and saves outputs to
         data/arrays/ as X_train_{image_size}.npy, y_train_{image_size}.npy,
-        X_test_{image_size}.npy, and y_test_{image_size}
+        X_test_{image_size}.npy, and y_test_{image_size}.npy
         """
         starttime = time.time()
         pool = mp.Pool(mp.cpu_count())
-        results = pool.map(self._preprocess, list(self.csv_data.iterrows()))
+        training_data, testing_data = zip(*pool.map(self._preprocess, self.csv_data.iterrows()))
 
         print("Combining outputs...")
-
-        training_data = [result[0] for result in results if result[0] != []]
-        testing_data = [result[1] for result in results if result[1] != []]
 
         random.shuffle(training_data)
         random.shuffle(testing_data)
