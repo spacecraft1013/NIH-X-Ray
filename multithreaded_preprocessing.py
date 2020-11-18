@@ -184,7 +184,8 @@ class PreprocessImages:
         """
         starttime = time.time()
         pool = mp.Pool(mp.cpu_count())
-        training_data, testing_data = zip(*pool.map(self._preprocess, self.csv_data.iterrows()))
+        results = pool.map(self._preprocess, self.csv_data.iterrows())
+        training_data, testing_data = zip(*results)
 
         print("Combining outputs...")
 
