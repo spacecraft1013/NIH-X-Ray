@@ -5,13 +5,14 @@ import time
 import numpy as np
 import onnx
 import torch
-import torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
-from torch.utils.data import DataLoader, TensorDataset
-from torch.optim import SGD, lr_scheduler
-from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
 import torch.multiprocessing as mp
+import torch.nn as nn
+from torch.cuda.amp import GradScaler, autocast
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.optim import SGD, lr_scheduler
+from torch.utils.data import DataLoader, TensorDataset
+from tqdm import tqdm as tq
 
 from multithreaded_preprocessing import PreprocessImages
 
@@ -39,7 +40,7 @@ def train(rank, world_size, traindata,
 
     loss_fn = nn.MultiLabelMarginLoss().to(rank)
     optimizer = SGD(ddp_model.parameters(), lr=1e-6, momentum=0.9)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
 
     best_model_wts = copy.deepcopy(ddp_model.state_dict())
 
@@ -49,10 +50,11 @@ def train(rank, world_size, traindata,
 
         running_loss = 0.0
 
-        for index, (inputs, labels) in enumerate(traindata):
-            startstep = time.time()
+        print('Training')
+        progressbar = tq(traindata, unit='steps', dynamic_ncols=True)
+        for index, (inputs, labels) in enumerate(progressbar):
+
             inputs, labels = inputs.to(rank), labels.to(rank)
-            print(f"{index+1}/{len(traindata)}", end=' ')
 
             ddp_model.train()
             optimizer.zero_grad()
@@ -66,34 +68,28 @@ def train(rank, world_size, traindata,
                 scaler.update()
 
             running_loss += loss.item() * inputs.size(0)
-
-            print(f"Training: {(time.time() - startstep)*1000:.2f}ms/step, \
-                  Loss: {running_loss/(index+1)}", end='\r')
+            progressbar.set_description(f'Loss: {running_loss/(index+1):.5f}')
+            progressbar.refresh()
 
             scheduler.step(loss)
-        print()
 
         running_loss = 0.0
 
         ddp_model.eval()
-        y_pred = []
-        for index, (inputs, labels) in enumerate(valdata):
-            startstep = time.time()
+        print('Validation')
+        progressbar = tq(traindata, unit='steps', dynamic_ncols=True)
+        for index, (inputs, labels) in enumerate(progressbar):
+
             inputs, labels = inputs.to(rank), labels.to(rank)
-            print(f"{index+1}/{len(valdata)}", end=' ')
 
             with torch.no_grad():
                 with autocast():
                     outputs = ddp_model(inputs)
                     loss = loss_fn(outputs, labels.long())
 
-            y_pred.extend(outputs.cpu().numpy())
-
             running_loss += loss.item() * inputs.size(0)
-
-            print(f"Validation: {(time.time() - startstep)*1000:.2f}ms/step, \
-                  Loss: {running_loss/(index+1)}", end='\r')
-        print()
+            progressbar.set_description(f'Loss: {running_loss/(index+1):.5f}')
+            progressbar.refresh()
 
         val_loss = running_loss / len(valdata)
 
@@ -122,24 +118,20 @@ def train(rank, world_size, traindata,
 
     ddp_model.eval()
     running_loss = 0.0
-    y_pred = []
-    for index, (inputs, labels) in enumerate(testdata):
-        startstep = time.time()
+    print('Testing')
+    progressbar = tq(testdata, unit='steps', dynamic_ncols=True)
+    for index, (inputs, labels) in enumerate(progressbar):
+
         inputs, labels = inputs.to(rank), labels.to(rank)
-        print(f"{index+1}/{len(valdata)}", end=' ')
 
         with torch.no_grad():
             with autocast():
                 outputs = ddp_model(inputs)
                 loss = loss_fn(outputs, labels.long())
 
-        y_pred.extend(outputs.cpu().numpy())
-
         running_loss += loss.item() * inputs.size(0)
-
-        print(f"Testing: {(time.time() - startstep)*1000:.2f}ms/step, \
-              Loss: {running_loss/(index+1)}", end='\r')
-    print()
+        progressbar.set_description(f'Test loss: {running_loss/(index+1):.5f}')
+        progressbar.refresh()
 
     if rank == 0:
         print("Saving model weights")
