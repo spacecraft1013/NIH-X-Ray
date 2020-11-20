@@ -83,7 +83,11 @@ for epoch in range(EPOCHS+1):
 
     running_loss = 0.0
     print('Training')
+<<<<<<< HEAD
     progressbar = tqdm(traindata, unit='steps', dynamic_ncols=True)
+=======
+    progressbar = tq(traindata, unit='steps', dynamic_ncols=True)
+>>>>>>> c8f05ab7ecb99a4b97710eaea24c442d9d02dd07
     for index, (inputs, labels) in enumerate(progressbar):
 
         inputs, labels = inputs.to(device), labels.to(device)
@@ -111,7 +115,11 @@ for epoch in range(EPOCHS+1):
 
     model.eval()
     print('Validation')
+<<<<<<< HEAD
     progressbar = tqdm(valdata, unit='steps', dynamic_ncols=True)
+=======
+    progressbar = tq(valdata, unit='steps', dynamic_ncols=True)
+>>>>>>> c8f05ab7ecb99a4b97710eaea24c442d9d02dd07
     for index, (inputs, labels) in enumerate(progressbar):
 
         inputs, labels = inputs.to(device), labels.to(device)
@@ -147,7 +155,11 @@ model.eval()
 running_loss = 0.0
 
 print('Testing')
+<<<<<<< HEAD
 progressbar = tqdm(testdata, dynamic_ncols=True)
+=======
+progressbar = tq(testdata, dynamic_ncols=True)
+>>>>>>> c8f05ab7ecb99a4b97710eaea24c442d9d02dd07
 for index, (inputs, labels) in enumerate(progressbar):
 
     inputs, labels = inputs.to(device), labels.to(device)
