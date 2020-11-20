@@ -11,7 +11,8 @@ import torch.nn as nn
 from torch.cuda.amp import GradScaler, autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import SGD, lr_scheduler
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, random_split
+from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm
 
 from multithreaded_preprocessing import PreprocessImages
@@ -31,8 +32,8 @@ def init_process(rank, world_size):
     dist.init_process_group("nccl", world_size=world_size, rank=rank)
 
 
-def train(rank, world_size, traindata,
-          valdata, testdata, scaler, model, starttime):
+def train(rank, world_size, traindata, valdata, testdata,
+          scaler, model, starttime, trainsampler, testsampler, valsampler):
     init_process(rank, world_size)
 
     model.to(rank)
@@ -47,6 +48,10 @@ def train(rank, world_size, traindata,
     for epoch in range(EPOCHS):
         print(f"Epoch {epoch+1}/{EPOCHS}")
         print('='*61)
+
+        trainsampler.set_epoch(epoch)
+        valsampler.set_epoch(epoch)
+        testsampler.set_epoch(epoch)
 
         running_loss = 0.0
 
@@ -179,18 +184,24 @@ if __name__ == '__main__':
     y_test = torch.Tensor(y_test)
 
     dataset = TensorDataset(X_train, y_train)
-    train_set, val_set = torch.utils.data.random_split(dataset, [70000, 16524])
+    train_set, val_set = random_split(dataset, [70000, 16524])
     test_set = TensorDataset(X_test, y_test)
-    traindata = DataLoader(train_set, shuffle=True,
-                           pin_memory=PIN_MEM, batch_size=BATCH_SIZE)
-    valdata = DataLoader(val_set, shuffle=True,
-                         pin_memory=PIN_MEM, batch_size=BATCH_SIZE)
-    testdata = DataLoader(test_set, shuffle=True,
-                          pin_memory=PIN_MEM, batch_size=BATCH_SIZE)
+
+    trainsampler = DistributedSampler(train_set, num_replicas=NUM_GPUS)
+    valsampler = DistributedSampler(val_set, num_replicas=NUM_GPUS)
+    testsampler = DistributedSampler(test_set, num_replicas=NUM_GPUS)
+
+    traindata = DataLoader(train_set, shuffle=True, pin_memory=PIN_MEM,
+                           batch_size=BATCH_SIZE, sampler=trainsampler)
+    valdata = DataLoader(val_set, shuffle=True, pin_memory=PIN_MEM,
+                         batch_size=BATCH_SIZE, sampler=valsampler)
+    testdata = DataLoader(test_set, shuffle=True, pin_memory=PIN_MEM,
+                          batch_size=BATCH_SIZE, sampler=testsampler)
 
     scaler = GradScaler()
 
     starttime = time.time()
 
-    args = (NUM_GPUS, traindata, valdata, testdata, scaler, model, starttime)
+    args = (NUM_GPUS, traindata, valdata, testdata, scaler, model, starttime,
+            trainsampler, valsampler, testsampler)
     mp.spawn(train, args=args, nprocs=NUM_GPUS)
