@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 from torch.cuda.amp import GradScaler, autocast
 from torch.optim import SGD, lr_scheduler
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, random_split
 from tqdm import tqdm
 
 from multithreaded_preprocessing import PreprocessImages
@@ -62,7 +62,7 @@ X_test = torch.Tensor(X_test)
 y_test = torch.Tensor(y_test)
 
 dataset = TensorDataset(X_train, y_train)
-train_set, val_set = torch.utils.data.random_split(dataset, [70000, 16524])
+train_set, val_set = random_split(dataset, [70000, 16524])
 val_labels = [label.numpy() for input, label in val_set]
 test_set = TensorDataset(X_test, y_test)
 traindata = DataLoader(train_set, shuffle=True,
