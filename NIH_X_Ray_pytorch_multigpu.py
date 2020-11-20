@@ -12,7 +12,7 @@ from torch.cuda.amp import GradScaler, autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import SGD, lr_scheduler
 from torch.utils.data import DataLoader, TensorDataset
-from tqdm import tqdm as tq
+from tqdm import tqdm
 
 from multithreaded_preprocessing import PreprocessImages
 
@@ -51,7 +51,7 @@ def train(rank, world_size, traindata,
         running_loss = 0.0
 
         print('Training')
-        progressbar = tq(traindata, unit='steps', dynamic_ncols=True)
+        progressbar = tqdm(traindata, unit='steps', dynamic_ncols=True)
         for index, (inputs, labels) in enumerate(progressbar):
 
             inputs, labels = inputs.to(rank), labels.to(rank)
@@ -77,7 +77,7 @@ def train(rank, world_size, traindata,
 
         ddp_model.eval()
         print('Validation')
-        progressbar = tq(traindata, unit='steps', dynamic_ncols=True)
+        progressbar = tqdm(traindata, unit='steps', dynamic_ncols=True)
         for index, (inputs, labels) in enumerate(progressbar):
 
             inputs, labels = inputs.to(rank), labels.to(rank)
@@ -119,7 +119,7 @@ def train(rank, world_size, traindata,
     ddp_model.eval()
     running_loss = 0.0
     print('Testing')
-    progressbar = tq(testdata, unit='steps', dynamic_ncols=True)
+    progressbar = tqdm(testdata, unit='steps', dynamic_ncols=True)
     for index, (inputs, labels) in enumerate(progressbar):
 
         inputs, labels = inputs.to(rank), labels.to(rank)
