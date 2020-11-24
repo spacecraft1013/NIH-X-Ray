@@ -1,17 +1,24 @@
-import cv2
-import pandas as pd
+import multiprocessing as mp
 import os
 import random
-import numpy as np
-import multiprocessing as mp
-from sklearn.preprocessing import MultiLabelBinarizer
 import time
 
-CATEGORIES = ["No Finding", "Atelectasis", "Cardiomegaly", "Effusion", "Infiltration", "Mass", "Nodule", "Pneumonia", "Pneumothorax", "Consolidation", "Edema", "Emphysema", "Fibrosis", "Pleural_Thickening", "Hernia"]
+import cv2
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import MultiLabelBinarizer
 
-class PreprocessImages():
+CATEGORIES = ["No Finding", "Atelectasis", "Cardiomegaly", "Effusion",
+              "Infiltration", "Mass", "Nodule", "Pneumonia", "Pneumothorax",
+              "Consolidation", "Edema", "Emphysema", "Fibrosis",
+              "Pleural_Thickening", "Hernia"]
+
+
+class PreprocessImages:
     """
-    A class for preprocessing images from the NIH ChestX-ray14 Dataset. Dataset can be downloaded at https://www.kaggle.com/nih-chest-xrays/data.
+    A class for preprocessing images from the NIH ChestX-ray14 Dataset.
+    Dataset can be downloaded at https://www.kaggle.com/nih-chest-xrays/data.
+
     Attributes
     ----------
     image_size : int
@@ -24,6 +31,7 @@ class PreprocessImages():
         Contents of the train_val_list.txt file in the dataset
     test_list : str
         Contents of the test_list.txt file in the dataset
+
     Methods
     -------
     start()
@@ -34,21 +42,23 @@ class PreprocessImages():
         Preprocesses a single row of the csv_data dataframe
     """
 
-    def __init__(self, dataset_dir, image_size=256):
+    def __init__(self, dataset_dir: str, image_size: int = 256, **kwargs):
         """
-        Constructs the image_size and dataset_dir attributes and runs load_initial_data()
+        Constructs the image_size and dataset_dir attributes and loads data
         """
         self.image_size = image_size
         self.dataset_dir = dataset_dir
-        self.csv_data, self.train_list, self.test_list = self.load_initial_data()
+        self.csv_data, self.train_list, self.test_list \
+            = self._load_initial_data()
 
     def __call__(self):
         """Calls self.start()"""
         return self.start()
 
-    def load_initial_data(self):
+    def _load_initial_data(self):
         """
         Loads the initial data needed for preprocessing
+
         Returns
         -------
         csv_data : pd.DataFrame
@@ -58,34 +68,78 @@ class PreprocessImages():
         test_list : str
             Data contained in test_list.txt
         """
-        csv_data = pd.read_csv(os.path.join(self.dataset_dir, 'Data_Entry_2017.csv'))
+        testpath = os.path.join(self.dataset_dir, "test_list.txt")
+        csvpath = os.path.join(self.dataset_dir, 'Data_Entry_2017.csv')
+        trainpath = os.path.join(self.dataset_dir, "train_val_list.txt")
 
-        with open(os.path.join(self.dataset_dir, "train_val_list.txt"), "r") as train_list_file:
+        csv_data = pd.read_csv(csvpath)
+
+        with open(trainpath, "r") as train_list_file:
             train_list = train_list_file.read()
-        with open(os.path.join(self.dataset_dir, "test_list.txt"), "r") as test_list_file:
+
+        with open(testpath, "r") as test_list_file:
             test_list = test_list_file.read()
+
         return csv_data, train_list, test_list
 
-    def findimage(self, name, path):
+    def _findimage(self, name, path):
         for root, dirs, files in os.walk(path):
             if name in files:
                 return os.path.join(root, name)
 
-    def preprocess(self, row):
+    def fourier(self, image: np.ndarray) -> np.ndarray:
+        """Does a Discrete Fourier Transform on the input image
+
+        Args:
+            image (np.ndarray): Input image
+
+        Returns:
+            np.ndarray: Fourier Transformed Image
         """
-        Preprocesses a single row of data
-        
-        Parameters
-        ----------
-        row : list
-            Row of csv data from dataset
-            
-        Returns
-        -------
-        training_data : list
-            If data is in train_list, contains np.ndarray with image data and list of labels
-        testing_data : list
-            If data is in test_list, contains np.ndarray with image data and list of labels
+        dft = cv2.dft(np.float32(image), flags=cv2.DFT_COMPLEX_OUTPUT)
+        dft_shift = np.fft.fftshift(dft)
+        return dft_shift
+
+    def edgedetect(self, image: np.ndarray, radius: int = 50) -> np.ndarray:
+        """Runs Fourier edge detection on image
+
+        Args:
+            image (np.ndarray): Input image
+            radius (int, optional): Radius of mask. Defaults to 50.
+
+        Returns:
+            np.ndarray: Edges of image
+        """
+        rows, cols, _ = image.shape
+        crow, ccol = int(rows / 2), int(cols / 2)
+
+        mask = np.ones((rows, cols, 2), np.uint8)
+
+        center = [crow, ccol]
+
+        x, y = np.ogrid[:rows, :cols]
+        mask_area = (x - center[0]) ** 2 + (y - center[1]) ** 2 <= radius**2
+        mask[mask_area] = 0
+
+        dft_shift = self.fourier(image)
+        fshift = dft_shift * mask
+
+        f_ishift = np.fft.ifftshift(fshift)
+        reversed = cv2.idft(f_ishift)
+        output = cv2.magnitude(reversed[:, :, 0], reversed[:, :, 1])
+        return output
+
+    def _preprocess(self, row: list) -> tuple:
+        """Preprocesses a single row of data
+
+        Args:
+            row (list): Row of Pandas dataframe
+
+        Returns:
+            training_data: If data is in train_list, contains np.ndarray
+                with image data and list of labels
+            testing_data: If data is in test_list, contains np.ndarray
+                with image data and list of labels
         """
         row = row[1]
         imagename = row['Image Index']
@@ -94,13 +148,15 @@ class PreprocessImages():
         training_data = []
         testing_data = []
 
+        imagesize_tuple = (self.image_size, self.image_size)
+
         if imagename in self.train_list:
             print("Training data: ", imagename)
             imagepath = self.findimage(imagename, self.dataset_dir)
-            
+
             img_array = cv2.imread(imagepath, cv2.IMREAD_GRAYSCALE)
-            img_array = cv2.resize(img_array, (self.image_size, self.image_size))
-            
+            img_array = cv2.resize(img_array, imagesize_tuple)
+
             multilabels = label.split("|")
             labels = [label for label in multilabels]
 
@@ -108,10 +164,10 @@ class PreprocessImages():
 
         elif imagename in self.test_list:
             print("Testing data: ", imagename)
-            imagepath = self.findimage(imagename, self.dataset_dir)
-            
+            imagepath = self._findimage(imagename, self.dataset_dir)
+
             img_array = cv2.imread(imagepath, cv2.IMREAD_GRAYSCALE)
-            img_array = cv2.resize(img_array, (self.image_size, self.image_size))
+            img_array = cv2.resize(img_array, imagesize_tuple)
 
             multilabels = label.split("|")
             labels = [label for label in multilabels]
@@ -122,27 +178,28 @@ class PreprocessImages():
 
     def start(self):
         """
-        Starts the multithreaded preprocessing and saves outputs to data/arrays/ as X_train_{image_size}.npy, y_train_{image_size}.npy, X_test_{image_size}.npy, and y_test_{image_size}
+        Starts the multithreaded preprocessing and saves outputs to
+        data/arrays/ as X_train_{image_size}.npy, y_train_{image_size}.npy,
+        X_test_{image_size}.npy, and y_test_{image_size}.npy
         """
         starttime = time.time()
         pool = mp.Pool(mp.cpu_count())
-        results = pool.map(self.preprocess, list(self.csv_data.iterrows()))
+        results = pool.map(self._preprocess, self.csv_data.iterrows())
+        training_data, testing_data = zip(*results)
 
         print("Combining outputs...")
 
-        training_data_total = [result[0] for result in results if result[0] != []]
-        testing_data_total = [result[1] for result in results if result[1] != []]
+        random.shuffle(training_data)
+        random.shuffle(testing_data)
 
-        random.shuffle(training_data_total)
-        random.shuffle(testing_data_total)
+        X_train = [item[0] for item in training_data]
+        y_train = [item[1] for item in training_data]
+        X_test = [item[0] for item in testing_data]
+        y_test = [item[1] for item in testing_data]
 
-        X_train = [item[0] for item in training_data_total]
-        y_train = [item[1] for item in training_data_total]
-        X_test = [item[0] for item in testing_data_total]
-        y_test = [item[1] for item in testing_data_total]
-
-        X_train = np.array(X_train).reshape(-1, self.image_size, self.image_size, 1)
-        X_test = np.array(X_test).reshape(-1, self.image_size, self.image_size, 1)
+        resizetuple = (-1, self.image_size, self.image_size, 1)
+        X_train = np.array(X_train).reshape(resizetuple)
+        X_test = np.array(X_test).reshape(resizetuple)
 
         mlb = MultiLabelBinarizer()
         y_train = mlb.fit_transform(y_train)
@@ -158,6 +215,7 @@ class PreprocessImages():
         np.save(f"data/arrays/y_test_{self.image_size}.npy", y_test)
 
         return (X_train, y_train), (X_test, y_test)
+
 
 if __name__ == "__main__":
     preprocessor = PreprocessImages()
