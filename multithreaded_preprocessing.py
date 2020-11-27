@@ -36,10 +36,11 @@ class PreprocessImages:
     -------
     start()
         Starts the multithreaded preprocessing of the dataset
-    load_initial_data()
-        Loads the initial data needed for the preprocessing
-    preprocess(row)
-        Preprocesses a single row of the csv_data dataframe
+    fourier(image)
+        Returns a Fourier transform of the image
+    edgedetect(image, radius)
+        Runs an edge detection algorithm on image, with radius being
+        the pixel radius of the high-pass filter used for the detection
     """
 
     def __init__(self, dataset_dir: str, image_size: int = 256, **kwargs):
