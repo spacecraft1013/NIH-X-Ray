@@ -153,7 +153,7 @@ class PreprocessImages:
 
         if imagename in self.train_list:
             print("Training data: ", imagename)
-            imagepath = self.findimage(imagename, self.dataset_dir)
+            imagepath = self._findimage(imagename, self.dataset_dir)
 
             img_array = cv2.imread(imagepath, cv2.IMREAD_GRAYSCALE)
             img_array = cv2.resize(img_array, imagesize_tuple)
