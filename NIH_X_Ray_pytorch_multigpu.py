@@ -176,8 +176,10 @@ if __name__ == '__main__':
                            pretrained=False)
     model.features[0] = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2),
                                   padding=(3, 3), bias=False)
-    model.classifier = nn.Linear(in_features=1920, out_features=15, bias=True)
-
+    model.classifier = nn.Sequential(
+        nn.Linear(in_features=1920, out_features=15, bias=True),
+        nn.Sigmoid()
+    )
     X_train = torch.Tensor(X_train)
     y_train = torch.Tensor(y_train)
     X_test = torch.Tensor(X_test)
