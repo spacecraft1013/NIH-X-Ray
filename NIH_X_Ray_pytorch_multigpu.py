@@ -146,7 +146,7 @@ def train(rank, world_size, traindata, valdata, testdata,
 
         print("Saving ONNX file")
         dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda')
-        torch.onnx.export(ddp_model, dummy_input, savepath, verbose=True)
+        torch.onnx.export(ddp_model, dummy_input, savepath)
         onnx.checker.check_model(f'data/models/{MODEL_SAVE_NAME}.onnx')
         print("ONNX model has been successfully saved!")
 

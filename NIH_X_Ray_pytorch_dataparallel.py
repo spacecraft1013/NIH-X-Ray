@@ -171,6 +171,6 @@ print("Model saved!\n")
 print("Saving ONNX file")
 onnx_save_path = f"data/models/{MODEL_SAVE_NAME}.onnx"
 dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda')
-torch.onnx.export(model, dummy_input, onnx_save_path, verbose=True)
+torch.onnx.export(model, dummy_input, onnx_save_path)
 onnx.checker.check_model(onnx_save_path)
 print("ONNX model has been successfully saved!")
