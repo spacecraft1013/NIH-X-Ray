@@ -80,7 +80,7 @@ starttime = time.time()
 best_model_wts = copy.deepcopy(model.state_dict())
 
 scaler = GradScaler()
-for epoch in range(EPOCHS+1):
+for epoch in range(EPOCHS):
     print(f"Epoch {epoch+1}/{EPOCHS}")
     print('='*61)
 
