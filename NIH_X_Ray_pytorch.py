@@ -163,8 +163,9 @@ for index, (inputs, labels) in enumerate(progressbar):
     progressbar.set_description(f'Test loss: {running_loss/(index+1):.5f}')
     progressbar.refresh()
 
-print("Saving model weights")
+print("Saving model")
 torch.save(model.state_dict(), f"data/models/{MODEL_SAVE_NAME}_weights.pth")
+torch.save(model, f"data/models/{MODEL_SAVE_NAME}.pth")
 print("Model saved!\n")
 
 print("Saving ONNX file")

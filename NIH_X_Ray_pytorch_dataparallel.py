@@ -166,6 +166,7 @@ for index, (inputs, labels) in enumerate(progressbar):
 
 print("Saving model weights")
 torch.save(model.state_dict(), f"data/models/{MODEL_SAVE_NAME}_weights.pth")
+torch.save(model, f"data/models/{MODEL_SAVE_NAME}.pth")
 print("Model saved!\n")
 
 print("Saving ONNX file")

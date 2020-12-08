@@ -142,6 +142,7 @@ def train(rank, world_size, traindata, valdata, testdata,
         print("Saving model weights")
         savepath = f"data/models/{MODEL_SAVE_NAME}_weights.pth"
         torch.save(ddp_model.state_dict(), savepath)
+        torch.save(ddp_model, f"data/models/{MODEL_SAVE_NAME}.pth")
         print("Model saved!\n")
 
         print("Saving ONNX file")
