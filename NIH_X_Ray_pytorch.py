@@ -14,7 +14,7 @@ from tqdm import tqdm
 from multithreaded_preprocessing import PreprocessImages
 
 MODEL_SAVE_NAME = "densenet201_pytorch"
-EPOCHS = 250
+EPOCHS = 1000
 IMAGE_SIZE = 256
 BATCH_SIZE = 32
 CHECKPOINT_DIR = f"data/checkpoints/{MODEL_SAVE_NAME}/"
@@ -112,7 +112,7 @@ for epoch in range(EPOCHS):
     running_loss = 0.0
 
     model.eval()
-    print('Validation')
+    print('\nValidation')
     progressbar = tqdm(valdata, unit='steps', dynamic_ncols=True)
     for index, (inputs, labels) in enumerate(progressbar):
 
