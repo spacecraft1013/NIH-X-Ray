@@ -1,8 +1,9 @@
+import argparse
 import copy
 import os
 import time
 
-import cupy as cp
+import numpy as np
 import onnx
 import torch
 import torch.distributed as dist
@@ -13,7 +14,6 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import SGD, lr_scheduler
 from torch.utils.data import DataLoader, TensorDataset, random_split
 from torch.utils.data.distributed import DistributedSampler
-from tqdm import tqdm
 
 from multithreaded_preprocessing import PreprocessImages
 
@@ -25,19 +25,28 @@ CHECKPOINT_DIR = f"data/checkpoints/{MODEL_SAVE_NAME}/"
 NUM_GPUS = torch.cuda.device_count()
 PIN_MEM = True
 
+def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args):
 
-def init_process(rank, world_size):
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '15000'
-    dist.init_process_group("nccl", world_size=world_size, rank=rank)
+    rank = args.nr * args.gpus + gpu_num
+    dist.init_process_group(
+        backend='nccl',
+        world_size=args.world_size,
+        rank=rank
+    )
 
+    model.to(gpu_num)
+    ddp_model = DDP(model, device_ids=[gpu_num])
 
-def train(rank, world_size, traindata, valdata, testdata,
-          scaler, model, starttime, trainsampler, testsampler, valsampler):
-    init_process(rank, world_size)
+    trainsampler = DistributedSampler(train_set, num_replicas=NUM_GPUS)
+    valsampler = DistributedSampler(val_set, num_replicas=NUM_GPUS)
+    testsampler = DistributedSampler(test_set, num_replicas=NUM_GPUS)
 
-    model.to(rank)
-    ddp_model = DDP(model, device_ids=rank)
+    traindata = DataLoader(train_set, pin_memory=PIN_MEM,
+                           batch_size=BATCH_SIZE, sampler=trainsampler)
+    valdata = DataLoader(val_set, pin_memory=PIN_MEM,
+                         batch_size=BATCH_SIZE, sampler=valsampler)
+    testdata = DataLoader(test_set, pin_memory=PIN_MEM,
+                          batch_size=BATCH_SIZE, sampler=testsampler)
 
     loss_fn = nn.MultiLabelMarginLoss().to(rank)
     optimizer = SGD(ddp_model.parameters(), lr=1e-6, momentum=0.9)
@@ -46,8 +55,9 @@ def train(rank, world_size, traindata, valdata, testdata,
     best_model_wts = copy.deepcopy(ddp_model.state_dict())
 
     for epoch in range(EPOCHS):
-        print(f"Epoch {epoch+1}/{EPOCHS}")
-        print('='*61)
+        if gpu_num == 0:
+            print(f"Epoch {epoch+1}/{EPOCHS}")
+            print('='*61)
 
         trainsampler.set_epoch(epoch)
         valsampler.set_epoch(epoch)
@@ -55,11 +65,12 @@ def train(rank, world_size, traindata, valdata, testdata,
 
         running_loss = 0.0
 
-        print('Training')
-        progressbar = tqdm(traindata, unit='steps', dynamic_ncols=True)
-        for index, (inputs, labels) in enumerate(progressbar):
+        if gpu_num == 0:
+            print('Training')
+        for index, (inputs, labels) in enumerate(traindata):
 
-            inputs, labels = inputs.to(rank), labels.to(rank)
+            steptime = time.time()
+            inputs, labels = inputs.to(gpu_num), labels.to(gpu_num)
 
             ddp_model.train()
             optimizer.zero_grad()
@@ -73,18 +84,20 @@ def train(rank, world_size, traindata, valdata, testdata,
                 scaler.update()
 
             running_loss += loss.item() * inputs.size(0)
-            progressbar.set_description(f'Loss: {running_loss/(index+1):.5f}')
-            progressbar.refresh()
+            if gpu_num == 0:
+                print(f'{index+1}/{len(traindata)} Loss: {running_loss/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
 
             scheduler.step(loss)
+        print()
 
         running_loss = 0.0
 
         ddp_model.eval()
-        print('Validation')
-        progressbar = tqdm(traindata, unit='steps', dynamic_ncols=True)
-        for index, (inputs, labels) in enumerate(progressbar):
+        if gpu_num == 0:
+            print('Validation')
+        for index, (inputs, labels) in enumerate(valdata):
 
+            steptime = time.time()
             inputs, labels = inputs.to(rank), labels.to(rank)
 
             with torch.no_grad():
@@ -93,8 +106,9 @@ def train(rank, world_size, traindata, valdata, testdata,
                     loss = loss_fn(outputs, labels.long())
 
             running_loss += loss.item() * inputs.size(0)
-            progressbar.set_description(f'Loss: {running_loss/(index+1):.5f}')
-            progressbar.refresh()
+            if gpu_num == 0:
+                print(f'{index+1}/{len(valdata)} Loss: {running_loss/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
+        print()
 
         val_loss = running_loss / len(valdata)
 
@@ -112,7 +126,7 @@ def train(rank, world_size, traindata, valdata, testdata,
             print(f"Checkpoint saved to checkpoint-{epoch:03d}.pth\n")
 
         dist.barrier()
-        map_location = {'cuda:0': f'cuda:{rank}'}
+        map_location = {'cuda:0': f'cuda:{gpu_num}'}
         ddp_model.load_state_dict(torch.load(checkpoint_path,
                                              map_location=map_location))
 
@@ -123,10 +137,12 @@ def train(rank, world_size, traindata, valdata, testdata,
 
     ddp_model.eval()
     running_loss = 0.0
-    print('Testing')
-    progressbar = tqdm(testdata, unit='steps', dynamic_ncols=True)
-    for index, (inputs, labels) in enumerate(progressbar):
 
+    if gpu_num == 0:
+        print('Testing')
+    for index, (inputs, labels) in enumerate(testdata):
+
+        steptime = time.time()
         inputs, labels = inputs.to(rank), labels.to(rank)
 
         with torch.no_grad():
@@ -135,8 +151,9 @@ def train(rank, world_size, traindata, valdata, testdata,
                 loss = loss_fn(outputs, labels.long())
 
         running_loss += loss.item() * inputs.size(0)
-        progressbar.set_description(f'Test loss: {running_loss/(index+1):.5f}')
-        progressbar.refresh()
+        if gpu_num == 0:
+            print(f'{index+1}/{len(testdata)} Loss: {running_loss/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
+    print()
 
     if rank == 0:
         print("Saving model weights")
@@ -153,25 +170,38 @@ def train(rank, world_size, traindata, valdata, testdata,
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-n', '--nodes', default=1, type=int, metavar='N',
+                        help='Number of nodes')
+    parser.add_argument('-g', '--gpus', default=1, type=int,
+                        help='Number of gpus per node')
+    parser.add_argument('-nr', '--nr', default=0, type=int,
+                        help='Node rank')
+    args = parser.parse_args()
+    args.world_size = args.gpus * args.nodes
+
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '15000'
+
     print("Importing Arrays")
     if not os.path.exists(f"data/arrays/X_train_{IMAGE_SIZE}.npy"):
         print("Arrays not found, generating...")
-        preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data",
+        preprocessor = PreprocessImages("/data/ambouk3/NIH-X-Ray-Dataset",
                                         IMAGE_SIZE)
         (X_train, y_train), (X_test, y_test) = preprocessor()
 
     else:
-        X_train = cp.load(open(f"data/arrays/X_train_{IMAGE_SIZE}.npy", "rb"))
-        y_train = cp.load(open(f"data/arrays/y_train_{IMAGE_SIZE}.npy", "rb"))
-        X_test = cp.load(open(f"data/arrays/X_test_{IMAGE_SIZE}.npy", "rb"))
-        y_test = cp.load(open(f"data/arrays/y_test_{IMAGE_SIZE}.npy", "rb"))
+        X_train = np.load(open(f"data/arrays/X_train_{IMAGE_SIZE}.npy", "rb"))
+        y_train = np.load(open(f"data/arrays/y_train_{IMAGE_SIZE}.npy", "rb"))
+        X_test = np.load(open(f"data/arrays/X_test_{IMAGE_SIZE}.npy", "rb"))
+        y_test = np.load(open(f"data/arrays/y_test_{IMAGE_SIZE}.npy", "rb"))
 
     if not os.path.exists(CHECKPOINT_DIR):
         os.mkdir(CHECKPOINT_DIR)
 
     # Convert channels-last to channels-first format
-    X_train = cp.transpose(X_train, (0, 3, 1, 2))
-    X_test = cp.transpose(X_test, (0, 3, 1, 2))
+    X_train = np.transpose(X_train, (0, 3, 1, 2))
+    X_test = np.transpose(X_test, (0, 3, 1, 2))
 
     model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet201',
                            pretrained=False)
@@ -181,6 +211,7 @@ if __name__ == '__main__':
         nn.Linear(in_features=1920, out_features=15, bias=True),
         nn.Sigmoid()
     )
+
     X_train = torch.Tensor(X_train)
     y_train = torch.Tensor(y_train)
     X_test = torch.Tensor(X_test)
@@ -190,21 +221,9 @@ if __name__ == '__main__':
     train_set, val_set = random_split(dataset, [70000, 16524])
     test_set = TensorDataset(X_test, y_test)
 
-    trainsampler = DistributedSampler(train_set, num_replicas=NUM_GPUS)
-    valsampler = DistributedSampler(val_set, num_replicas=NUM_GPUS)
-    testsampler = DistributedSampler(test_set, num_replicas=NUM_GPUS)
-
-    traindata = DataLoader(train_set, shuffle=True, pin_memory=PIN_MEM,
-                           batch_size=BATCH_SIZE, sampler=trainsampler)
-    valdata = DataLoader(val_set, shuffle=True, pin_memory=PIN_MEM,
-                         batch_size=BATCH_SIZE, sampler=valsampler)
-    testdata = DataLoader(test_set, shuffle=True, pin_memory=PIN_MEM,
-                          batch_size=BATCH_SIZE, sampler=testsampler)
-
     scaler = GradScaler()
 
     starttime = time.time()
 
-    args = (NUM_GPUS, traindata, valdata, testdata, scaler, model, starttime,
-            trainsampler, valsampler, testsampler)
-    mp.spawn(train, args=args, nprocs=NUM_GPUS)
+    args = (scaler, model, starttime, train_set, val_set, test_set, args)
+    mp.spawn(train, args=args, nprocs=NUM_GPUS, join=True)
