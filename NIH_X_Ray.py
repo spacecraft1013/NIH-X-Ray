@@ -1,9 +1,11 @@
-import numpy as np
-import keras
 import datetime
 import os
-from multithreaded_preprocessing import PreprocessImages
+
+import cupy as cp
+import keras
 from keras.callbacks import ModelCheckpoint, TensorBoard
+
+from multithreaded_preprocessing import PreprocessImages
 
 model_save_name = "densenet201_kld"
 epochs = 250
@@ -17,10 +19,10 @@ if not os.path.exists(f"data/arrays/X_train_{image_size}.npy"):
     (X_train, y_train), (X_test, y_test) = preprocessor()
 
 else:
-    X_train = np.load(open(f"data/arrays/X_train_{image_size}.npy", "rb"))
-    y_train = np.load(open(f"data/arrays/y_train_{image_size}.npy", "rb"))
-    X_test = np.load(open(f"data/arrays/X_test_{image_size}.npy", "rb"))
-    y_test = np.load(open(f"data/arrays/y_test_{image_size}.npy", "rb"))
+    X_train = cp.load(open(f"data/arrays/X_train_{image_size}.npy", "rb"))
+    y_train = cp.load(open(f"data/arrays/y_train_{image_size}.npy", "rb"))
+    X_test = cp.load(open(f"data/arrays/X_test_{image_size}.npy", "rb"))
+    y_test = cp.load(open(f"data/arrays/y_test_{image_size}.npy", "rb"))
 
 # tuner = kt.BayesianOptimization(model_generator,
 #                                 objective='val_accuracy', max_trials=500,

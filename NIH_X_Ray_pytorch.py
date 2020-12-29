@@ -2,10 +2,11 @@ import copy
 import os
 import time
 
-import numpy as np
+import cupy as cp
 import onnx
 import torch
 import torch.nn as nn
+from sklearn.utils.class_weight import compute_class_weight
 from torch.cuda.amp import GradScaler, autocast
 from torch.optim import SGD, lr_scheduler
 from torch.utils.data import DataLoader, TensorDataset, random_split
@@ -35,14 +36,14 @@ if not os.path.exists(f"data/arrays/X_train_{IMAGE_SIZE}.npy"):
     (X_train, y_train), (X_test, y_test) = preprocessor()
 
 else:
-    X_train = np.load(open(f"data/arrays/X_train_{IMAGE_SIZE}.npy", "rb"))
-    y_train = np.load(open(f"data/arrays/y_train_{IMAGE_SIZE}.npy", "rb"))
-    X_test = np.load(open(f"data/arrays/X_test_{IMAGE_SIZE}.npy", "rb"))
-    y_test = np.load(open(f"data/arrays/y_test_{IMAGE_SIZE}.npy", "rb"))
+    X_train = cp.load(open(f"data/arrays/X_train_{IMAGE_SIZE}.npy", "rb"))
+    y_train = cp.load(open(f"data/arrays/y_train_{IMAGE_SIZE}.npy", "rb"))
+    X_test = cp.load(open(f"data/arrays/X_test_{IMAGE_SIZE}.npy", "rb"))
+    y_test = cp.load(open(f"data/arrays/y_test_{IMAGE_SIZE}.npy", "rb"))
 
 # Convert channels-last to channels-first format
-X_train = np.transpose(X_train, (0, 3, 1, 2))
-X_test = np.transpose(X_test, (0, 3, 1, 2))
+X_train = cp.transpose(X_train, (0, 3, 1, 2))
+X_test = cp.transpose(X_test, (0, 3, 1, 2))
 
 model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet201',
                        pretrained=False)
@@ -55,7 +56,7 @@ model.classifier = nn.Sequential(
 
 model.to(device)
 
-loss_fn = nn.MultiLabelMarginLoss().to(device)
+loss_fn = nn.MultiLabelSoftMarginLoss().to(device)
 optimizer = SGD(model.parameters(), lr=1e-6, momentum=0.9)
 scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
 
@@ -142,7 +143,8 @@ for epoch in range(EPOCHS):
     print(f"Checkpoint saved to checkpoint-{epoch:03d}.pth\n")
 
 time_elapsed = time.time() - starttime
-print(f"Training complete in {time_elapsed // 60}m {time_elapsed % 60}s")
+print(f"Training complete in {int(time_elapsed // 3600)}h \
+      {int(time_elapsed // 60)}m {round(time_elapsed % 60)}s")
 
 model.load_state_dict(best_model_wts)
 model.eval()
