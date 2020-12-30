@@ -90,6 +90,9 @@ starttime = time.time()
 best_model_wts = copy.deepcopy(model.state_dict())
 
 writer = SummaryWriter("data/tensorboard_logs", comment=MODEL_SAVE_NAME)
+dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda:0')
+writer.add_graph(model, dummy_input)
+writer.flush()
 scaler = GradScaler()
 for epoch in range(args.epochs):
     print(f"Epoch {epoch+1}/{args.epochs}")
@@ -195,7 +198,7 @@ print("Model saved!\n")
 
 print("Saving ONNX file")
 onnx_save_path = f"data/models/{MODEL_SAVE_NAME}.onnx"
-dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda')
+dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda:0')
 torch.onnx.export(model, dummy_input, onnx_save_path)
 onnx.checker.check_model(onnx_save_path)
 print("ONNX model has been successfully saved!")
