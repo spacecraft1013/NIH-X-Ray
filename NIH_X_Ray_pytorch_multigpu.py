@@ -177,10 +177,12 @@ if __name__ == '__main__':
                         help='Number of gpus per node')
     parser.add_argument('-nr', '--nr', default=0, type=int,
                         help='Node rank')
+    parser.add_argument('-m', '--master', default='localhost', type=str,
+                        help='IP address of master node')
     args = parser.parse_args()
     args.world_size = args.gpus * args.nodes
 
-    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_ADDR'] = args.master
     os.environ['MASTER_PORT'] = '15000'
 
     print("Importing Arrays")
