@@ -68,6 +68,7 @@ if args.checkpoint:
 loss_fn = nn.MultiLabelMarginLoss().to(device)
 optimizer = SGD(model.parameters(), lr=1e-6, momentum=0.9)
 scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
+mse_fn = nn.MSELoss()
 
 X_train = torch.Tensor(X_train)
 y_train = torch.Tensor(y_train)
@@ -95,6 +96,7 @@ for epoch in range(args.epochs):
     print('='*61)
 
     running_loss = 0.0
+    running_mse = 0.0
     print('Training')
     progressbar = tqdm(traindata, unit='steps', dynamic_ncols=True)
     for index, (inputs, labels) in enumerate(progressbar):
@@ -113,15 +115,18 @@ for epoch in range(args.epochs):
             scaler.update()
 
         running_loss += loss.item() * inputs.size(0)
-        progressbar.set_description(f'Loss: {running_loss/(index+1):.5f}')
+        mse = mse_fn(outputs, labels.long())
+        running_mse += mse.item * inputs.size(0)
+        progressbar.set_description(f'Loss: {running_loss/(index+1):.5f}, MSE: {running_mse/(index+1):.5f}')
         progressbar.refresh()
 
         scheduler.step(loss)
 
     epoch_loss = running_loss / len(traindata)
-    writer.add_scalar('Loss/Train', epoch_loss, epoch+1)
+    epoch_mse = running_mse / len(traindata)
 
     running_loss = 0.0
+    running_mse = 0.0
 
     model.eval()
     print('\nValidation')
@@ -136,11 +141,11 @@ for epoch in range(args.epochs):
                 loss = loss_fn(outputs, labels.long())
 
         running_loss += loss.item() * inputs.size(0)
-        progressbar.set_description(f'Val loss: {running_loss/(index+1):.5f}')
+        progressbar.set_description(f'Val loss: {running_loss/(index+1):.5f}, Val MSE: {running_mse/(index+1):.5f}')
         progressbar.refresh()
 
     val_loss = running_loss / len(valdata)
-    writer.add_scalar('Loss/Validation', val_loss, epoch+1)
+    val_mse = running_mse / len(valdata)
 
     if epoch == 0:
         best_loss = val_loss
@@ -150,12 +155,14 @@ for epoch in range(args.epochs):
         best_model_wts = copy.deepcopy(model.state_dict())
 
     writer.add_scalars('Loss', {'Training': epoch_loss, 'Validation': val_loss}, epoch+1)
+    writer.add_scalars('MSE', {'Training': epoch_mse, 'Validation': val_mse}, epoch+1)
+    writer.flush()
 
     checkpoint_path = os.path.join(CHECKPOINT_DIR,
                                    f"checkpoint-{epoch:03d}.pth")
     torch.save(model.state_dict(), checkpoint_path)
     print(f"Checkpoint saved to checkpoint-{epoch:03d}.pth\n")
-    writer.flush()
+
 writer.close()
 
 time_elapsed = time.time() - starttime

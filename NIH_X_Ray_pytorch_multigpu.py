@@ -19,7 +19,6 @@ from torch.utils.tensorboard import SummaryWriter
 from multithreaded_preprocessing import PreprocessImages
 
 MODEL_SAVE_NAME = "densenet201_pytorch"
-EPOCHS = 250
 IMAGE_SIZE = 256
 BATCH_SIZE = 32
 CHECKPOINT_DIR = f"data/checkpoints/{MODEL_SAVE_NAME}/"
@@ -38,6 +37,9 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, write
     model.to(gpu_num)
     ddp_model = DDP(model, device_ids=[gpu_num])
 
+    if args.checkpoint:
+        ddp_model.load_state_dict(torch.load(args.checkpoint))
+
     trainsampler = DistributedSampler(train_set, num_replicas=NUM_GPUS)
     valsampler = DistributedSampler(val_set, num_replicas=NUM_GPUS)
     testsampler = DistributedSampler(test_set, num_replicas=NUM_GPUS)
@@ -52,12 +54,13 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, write
     loss_fn = nn.MultiLabelMarginLoss().to(rank)
     optimizer = SGD(ddp_model.parameters(), lr=1e-6, momentum=0.9)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
+    mse_fn = nn.MSELoss()
 
     best_model_wts = copy.deepcopy(ddp_model.state_dict())
 
-    for epoch in range(EPOCHS):
+    for epoch in range(args.epochs):
         if gpu_num == 0:
-            print(f"Epoch {epoch+1}/{EPOCHS}")
+            print(f"Epoch {epoch+1}/{args.epochs}")
             print('='*61)
 
         trainsampler.set_epoch(epoch)
@@ -65,6 +68,7 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, write
         testsampler.set_epoch(epoch)
 
         running_loss = 0.0
+        running_mse = 0.0
 
         if gpu_num == 0:
             print('Training')
@@ -85,16 +89,20 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, write
                 scaler.update()
 
             running_loss += loss.item() * inputs.size(0)
+
+            mse = mse_fn(outputs, labels.long())
+            running_mse += mse.item * inputs.size(0)
             if gpu_num == 0:
-                print(f'{index+1}/{len(traindata)} Loss: {running_loss/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
+                print(f'{index+1}/{len(traindata)} Loss: {running_loss/(index+1):.5f}, \
+                    MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
 
             scheduler.step(loss)
         epoch_loss = running_loss / len(traindata)
-        if rank == 0:
-            writer.add_scalar('Loss/train', epoch_loss, epoch+1)
+        epoch_mse = running_mse / len(traindata)
         print()
 
         running_loss = 0.0
+        running_mse = 0.0
 
         ddp_model.eval()
         if gpu_num == 0:
@@ -110,13 +118,16 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, write
                     loss = loss_fn(outputs, labels.long())
 
             running_loss += loss.item() * inputs.size(0)
+
+            mse = mse_fn(outputs, labels.long())
+            running_mse += mse.item * inputs.size(0)
             if gpu_num == 0:
-                print(f'{index+1}/{len(valdata)} Loss: {running_loss/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
+                print(f'{index+1}/{len(valdata)} Loss: {running_loss/(index+1):.5f}, \
+                    MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
         print()
 
         val_loss = running_loss / len(valdata)
-        if rank == 0:
-            writer.add_scalar('Loss/validation', val_loss, epoch+1)
+        val_mse = running_mse / len(valdata)
 
         if epoch == 0:
             best_loss = val_loss
@@ -124,6 +135,11 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, write
         elif val_loss < best_loss:
             best_loss = val_loss
             best_model_wts = copy.deepcopy(ddp_model.state_dict())
+
+        if rank == 0:
+            writer.add_scalars('Loss', {'Training': epoch_loss, 'Validation': val_loss}, epoch+1)
+            writer.add_scalars('MSE', {'Training': epoch_mse, 'Validation': val_mse}, epoch+1)
+            writer.flush()
 
         checkpoint_path = os.path.join(CHECKPOINT_DIR,
                                        f"checkpoint-{epoch:03d}.pth")
@@ -136,8 +152,10 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, write
         ddp_model.load_state_dict(torch.load(checkpoint_path,
                                              map_location=map_location))
 
+    writer.close()
     time_elapsed = time.time() - starttime
-    print(f"Training complete in {time_elapsed // 60}m {time_elapsed % 60}s")
+    print(f"Training complete in {time_elapsed // 3600}h \
+      {time_elapsed // 60}m {round(time_elapsed % 60)}s")
 
     ddp_model.load_state_dict(best_model_wts)
 
@@ -187,6 +205,10 @@ if __name__ == '__main__':
                         help='IP address of master node')
     parser.add_argument('-p', '--port', default='15000', type=str,
                         help='Port to communicate over')
+    parser.add_argument('-c', '--checkpoint', default=None, type=str,
+                        help='Checkpoint file to load from')
+    parser.add_argument('-e', '--epochs', default=250, type=int,
+                        help='Number of epochs to use')
     args = parser.parse_args()
     args.world_size = args.gpus * args.nodes
 
