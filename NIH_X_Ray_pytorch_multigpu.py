@@ -52,7 +52,7 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
                           batch_size=BATCH_SIZE, sampler=testsampler)
 
     if rank == 0:
-        writer = SummaryWriter("data/tensorboard_logs", comment=MODEL_SAVE_NAME)
+        writer = SummaryWriter("data/logs", comment=MODEL_SAVE_NAME)
         dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda:0')
         writer.add_graph(model, dummy_input)
         writer.flush()

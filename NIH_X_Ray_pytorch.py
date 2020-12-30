@@ -89,7 +89,7 @@ starttime = time.time()
 
 best_model_wts = copy.deepcopy(model.state_dict())
 
-writer = SummaryWriter("data/tensorboard_logs", comment=MODEL_SAVE_NAME)
+writer = SummaryWriter("data/logs", comment=MODEL_SAVE_NAME)
 dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda:0')
 writer.add_graph(model, dummy_input)
 writer.flush()
