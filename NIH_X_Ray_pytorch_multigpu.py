@@ -25,7 +25,7 @@ CHECKPOINT_DIR = f"data/checkpoints/{MODEL_SAVE_NAME}/"
 NUM_GPUS = torch.cuda.device_count()
 PIN_MEM = True
 
-def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, writer, args):
+def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args):
 
     rank = args.nr * args.gpus + gpu_num
     dist.init_process_group(
@@ -51,10 +51,16 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, write
     testdata = DataLoader(test_set, pin_memory=PIN_MEM,
                           batch_size=BATCH_SIZE, sampler=testsampler)
 
-    loss_fn = nn.MultiLabelMarginLoss().to(rank)
+    if rank == 0:
+        writer = SummaryWriter("data/tensorboard_logs", comment=MODEL_SAVE_NAME)
+        dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda:0')
+        writer.add_graph(model, dummy_input)
+        writer.flush()
+
+    loss_fn = nn.MultiLabelMarginLoss().to(gpu_num)
     optimizer = SGD(ddp_model.parameters(), lr=1e-6, momentum=0.9)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
-    mse_fn = nn.MSELoss()
+    mse_fn = nn.MSELoss().to(gpu_num)
 
     best_model_wts = copy.deepcopy(ddp_model.state_dict())
 
@@ -91,10 +97,10 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, write
             running_loss += loss.item() * inputs.size(0)
 
             mse = mse_fn(outputs, labels.long())
-            running_mse += mse.item * inputs.size(0)
+            running_mse += mse.item() * inputs.size(0)
             if gpu_num == 0:
                 print(f'{index+1}/{len(traindata)} Loss: {running_loss/(index+1):.5f}, \
-                    MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
+MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
 
             scheduler.step(loss)
         epoch_loss = running_loss / len(traindata)
@@ -120,10 +126,10 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, write
             running_loss += loss.item() * inputs.size(0)
 
             mse = mse_fn(outputs, labels.long())
-            running_mse += mse.item * inputs.size(0)
+            running_mse += mse.item() * inputs.size(0)
             if gpu_num == 0:
                 print(f'{index+1}/{len(valdata)} Loss: {running_loss/(index+1):.5f}, \
-                    MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
+MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
         print()
 
         val_loss = running_loss / len(valdata)
@@ -152,10 +158,11 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, write
         ddp_model.load_state_dict(torch.load(checkpoint_path,
                                              map_location=map_location))
 
-    writer.close()
+    if rank == 0:
+        writer.close()
     time_elapsed = time.time() - starttime
     print(f"Training complete in {time_elapsed // 3600}h \
-      {time_elapsed // 60}m {round(time_elapsed % 60)}s")
+{time_elapsed // 60}m {round(time_elapsed % 60)}s")
 
     ddp_model.load_state_dict(best_model_wts)
 
@@ -187,7 +194,7 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, write
         print("Model saved!\n")
 
         print("Saving ONNX file")
-        dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda')
+        dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda:0')
         torch.onnx.export(ddp_model, dummy_input, savepath)
         onnx.checker.check_model(f'data/models/{MODEL_SAVE_NAME}.onnx')
         print("ONNX model has been successfully saved!")
@@ -254,9 +261,8 @@ if __name__ == '__main__':
     test_set = TensorDataset(X_test, y_test)
 
     scaler = GradScaler()
-    writer = SummaryWriter("data/tensorboard_logs", comment=MODEL_SAVE_NAME)
 
     starttime = time.time()
 
-    args = (scaler, model, starttime, train_set, val_set, test_set, writer, args)
+    args = (scaler, model, starttime, train_set, val_set, test_set, args)
     mp.spawn(train, args=args, nprocs=NUM_GPUS, join=True)
