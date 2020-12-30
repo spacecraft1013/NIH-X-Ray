@@ -1,3 +1,4 @@
+import argparse
 import copy
 import os
 import time
@@ -15,13 +16,19 @@ from tqdm import tqdm
 from multithreaded_preprocessing import PreprocessImages
 
 MODEL_SAVE_NAME = "densenet201_pytorch"
-EPOCHS = 1000
 IMAGE_SIZE = 256
 BATCH_SIZE = 32
 CHECKPOINT_DIR = f"data/checkpoints/{MODEL_SAVE_NAME}/"
 
 if not os.path.exists(CHECKPOINT_DIR):
     os.mkdir(CHECKPOINT_DIR)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-c', '--checkpoint', default=None, type=str,
+                    help='Checkpoint file to load from')
+parser.add_argument('-e', '--epochs', default=250, type=int,
+                    help='Number of epochs to use')
+args = parser.parse_args()
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
@@ -55,6 +62,8 @@ model.classifier = nn.Sequential(
 )
 
 model.to(device)
+if args.checkpoint:
+    model.load_state_dict(torch.load(args.checkpoint))
 
 loss_fn = nn.MultiLabelMarginLoss().to(device)
 optimizer = SGD(model.parameters(), lr=1e-6, momentum=0.9)
@@ -81,8 +90,8 @@ best_model_wts = copy.deepcopy(model.state_dict())
 
 writer = SummaryWriter("data/tensorboard_logs", comment=MODEL_SAVE_NAME)
 scaler = GradScaler()
-for epoch in range(EPOCHS):
-    print(f"Epoch {epoch+1}/{EPOCHS}")
+for epoch in range(args.epochs):
+    print(f"Epoch {epoch+1}/{args.epochs}")
     print('='*61)
 
     running_loss = 0.0
@@ -150,8 +159,8 @@ for epoch in range(EPOCHS):
 writer.close()
 
 time_elapsed = time.time() - starttime
-print(f"Training complete in {int(time_elapsed // 3600)}h \
-      {int(time_elapsed // 60)}m {round(time_elapsed % 60)}s")
+print(f"Training complete in {time_elapsed // 3600}h \
+      {time_elapsed // 60}m {round(time_elapsed % 60)}s")
 
 model.load_state_dict(best_model_wts)
 model.eval()
