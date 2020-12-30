@@ -18,7 +18,7 @@ from multithreaded_preprocessing import PreprocessImages
 MODEL_SAVE_NAME = "densenet201_pytorch"
 IMAGE_SIZE = 256
 BATCH_SIZE = 32
-CHECKPOINT_DIR = f"data/checkpoints/{MODEL_SAVE_NAME}-{time.time()}/"
+CHECKPOINT_DIR = f"data/checkpoints/{MODEL_SAVE_NAME}-{int(time.time())}/"
 
 if not os.path.exists(CHECKPOINT_DIR):
     os.mkdir(CHECKPOINT_DIR)
@@ -192,14 +192,14 @@ for index, (inputs, labels) in enumerate(progressbar):
     progressbar.refresh()
 
 print("Saving model weights")
-savepath = f"data/models/{MODEL_SAVE_NAME}-{time.time()}.pth"
-savepath_weights = f"data/models/{MODEL_SAVE_NAME}-{time.time()}_weights.pth"
+savepath = f"data/models/{MODEL_SAVE_NAME}-{int(time.time())}.pth"
+savepath_weights = f"data/models/{MODEL_SAVE_NAME}-{int(time.time())}_weights.pth"
 torch.save(model.state_dict(), savepath_weights)
 torch.save(model, savepath)
 print("Model saved!\n")
 
 print("Saving ONNX file")
-savepath_onnx = f"data/models/{MODEL_SAVE_NAME}-{time.time()}.onnx"
+savepath_onnx = f"data/models/{MODEL_SAVE_NAME}-{int(time.time())}.onnx"
 dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda:0')
 torch.onnx.export(model, dummy_input, savepath_onnx)
 onnx.checker.check_model(savepath_onnx)
