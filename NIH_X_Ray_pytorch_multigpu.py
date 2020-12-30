@@ -179,11 +179,13 @@ if __name__ == '__main__':
                         help='Node rank')
     parser.add_argument('-m', '--master', default='localhost', type=str,
                         help='IP address of master node')
+    parser.add_argument('-p', '--port', default='15000', type=str,
+                        help='Port to communicate over')
     args = parser.parse_args()
     args.world_size = args.gpus * args.nodes
 
     os.environ['MASTER_ADDR'] = args.master
-    os.environ['MASTER_PORT'] = '15000'
+    os.environ['MASTER_PORT'] = args.port
 
     print("Importing Arrays")
     if not os.path.exists(f"data/arrays/X_train_{IMAGE_SIZE}.npy"):
