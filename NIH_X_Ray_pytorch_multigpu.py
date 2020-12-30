@@ -14,6 +14,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import SGD, lr_scheduler
 from torch.utils.data import DataLoader, TensorDataset, random_split
 from torch.utils.data.distributed import DistributedSampler
+from torch.utils.tensorboard import SummaryWriter
 
 from multithreaded_preprocessing import PreprocessImages
 
@@ -25,7 +26,7 @@ CHECKPOINT_DIR = f"data/checkpoints/{MODEL_SAVE_NAME}/"
 NUM_GPUS = torch.cuda.device_count()
 PIN_MEM = True
 
-def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args):
+def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, writer, args):
 
     rank = args.nr * args.gpus + gpu_num
     dist.init_process_group(
@@ -88,6 +89,9 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
                 print(f'{index+1}/{len(traindata)} Loss: {running_loss/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
 
             scheduler.step(loss)
+        epoch_loss = running_loss / len(traindata)
+        if rank == 0:
+            writer.add_scalar('Loss/train', epoch_loss, epoch+1)
         print()
 
         running_loss = 0.0
@@ -111,6 +115,8 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
         print()
 
         val_loss = running_loss / len(valdata)
+        if rank == 0:
+            writer.add_scalar('Loss/validation', val_loss, epoch+1)
 
         if epoch == 0:
             best_loss = val_loss
@@ -226,8 +232,9 @@ if __name__ == '__main__':
     test_set = TensorDataset(X_test, y_test)
 
     scaler = GradScaler()
+    writer = SummaryWriter("data/tensorboard_logs", comment=MODEL_SAVE_NAME)
 
     starttime = time.time()
 
-    args = (scaler, model, starttime, train_set, val_set, test_set, args)
+    args = (scaler, model, starttime, train_set, val_set, test_set, writer, args)
     mp.spawn(train, args=args, nprocs=NUM_GPUS, join=True)
