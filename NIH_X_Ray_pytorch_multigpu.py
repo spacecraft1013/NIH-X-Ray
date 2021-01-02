@@ -201,6 +201,8 @@ MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end
         onnx.checker.check_model(savepath_onnx)
         print("ONNX model has been successfully saved!")
 
+    dist.destroy_process_group()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
