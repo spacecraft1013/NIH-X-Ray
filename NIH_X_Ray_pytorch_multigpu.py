@@ -37,7 +37,7 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
     valsampler = DistributedSampler(val_set, num_replicas=args.gpus)
     testsampler = DistributedSampler(test_set, num_replicas=args.gpus)
 
-    traindata = DataLoader(train_set, pin_memory=args.pi,
+    traindata = DataLoader(train_set, pin_memory=(not args.no_pin_mem),
                            batch_size=args.batch_size, sampler=trainsampler)
     valdata = DataLoader(val_set, pin_memory=(not args.no_pin_mem),
                          batch_size=args.batch_size, sampler=valsampler)
@@ -140,7 +140,7 @@ MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end
             writer.add_scalars('MSE', {'Training': epoch_mse, 'Validation': val_mse}, epoch+1)
             writer.flush()
 
-        checkpoint_path = os.path.join(args.checkpoint-dir,
+        checkpoint_path = os.path.join(args.checkpoint_dir,
                                        f"checkpoint-{epoch:03d}.pth")
         if rank == 0:
             torch.save(ddp_model.state_dict(), checkpoint_path)
