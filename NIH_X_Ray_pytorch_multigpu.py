@@ -18,13 +18,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 from multithreaded_preprocessing import PreprocessImages
 
-MODEL_SAVE_NAME = "densenet201_pytorch"
-IMAGE_SIZE = 256
-BATCH_SIZE = 32
-CHECKPOINT_DIR = f"data/checkpoints/{MODEL_SAVE_NAME}-{int(time.time())}/"
-NUM_GPUS = torch.cuda.device_count()
-PIN_MEM = True
-
 def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args):
 
     rank = args.nr * args.gpus + gpu_num
@@ -40,20 +33,20 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
     if args.checkpoint:
         ddp_model.load_state_dict(torch.load(args.checkpoint))
 
-    trainsampler = DistributedSampler(train_set, num_replicas=NUM_GPUS)
-    valsampler = DistributedSampler(val_set, num_replicas=NUM_GPUS)
-    testsampler = DistributedSampler(test_set, num_replicas=NUM_GPUS)
+    trainsampler = DistributedSampler(train_set, num_replicas=args.gpus)
+    valsampler = DistributedSampler(val_set, num_replicas=args.gpus)
+    testsampler = DistributedSampler(test_set, num_replicas=args.gpus)
 
-    traindata = DataLoader(train_set, pin_memory=PIN_MEM,
-                           batch_size=BATCH_SIZE, sampler=trainsampler)
-    valdata = DataLoader(val_set, pin_memory=PIN_MEM,
-                         batch_size=BATCH_SIZE, sampler=valsampler)
-    testdata = DataLoader(test_set, pin_memory=PIN_MEM,
-                          batch_size=BATCH_SIZE, sampler=testsampler)
+    traindata = DataLoader(train_set, pin_memory=args.pi,
+                           batch_size=args.batch_size, sampler=trainsampler)
+    valdata = DataLoader(val_set, pin_memory=(not args.no_pin_mem),
+                         batch_size=args.batch_size, sampler=valsampler)
+    testdata = DataLoader(test_set, pin_memory=(not args.no_pin_mem),
+                          batch_size=args.batch_size, sampler=testsampler)
 
     if rank == 0:
-        writer = SummaryWriter("data/logs", comment=MODEL_SAVE_NAME)
-        dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda:0')
+        writer = SummaryWriter("data/logs", comment=args.name)
+        dummy_input = torch.randn(1, 1, args.img_size, args.img_size, device='cuda:0')
         writer.add_graph(model, dummy_input)
         writer.flush()
 
@@ -147,7 +140,7 @@ MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end
             writer.add_scalars('MSE', {'Training': epoch_mse, 'Validation': val_mse}, epoch+1)
             writer.flush()
 
-        checkpoint_path = os.path.join(CHECKPOINT_DIR,
+        checkpoint_path = os.path.join(args.checkpoint-dir,
                                        f"checkpoint-{epoch:03d}.pth")
         if rank == 0:
             torch.save(ddp_model.state_dict(), checkpoint_path)
@@ -188,15 +181,15 @@ MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end
 
     if rank == 0:
         print("Saving model weights")
-        savepath = f"data/models/{MODEL_SAVE_NAME}-{int(time.time())}.pth"
-        savepath_weights = f"data/models/{MODEL_SAVE_NAME}-{int(time.time())}_weights.pth"
+        savepath = f"data/models/{args.name}-{int(time.time())}.pth"
+        savepath_weights = f"data/models/{args.name}-{int(time.time())}_weights.pth"
         torch.save(ddp_model.state_dict(), savepath_weights)
         torch.save(ddp_model, savepath)
         print("Model saved!\n")
 
         print("Saving ONNX file")
-        savepath_onnx = f"data/models/{MODEL_SAVE_NAME}-{int(time.time())}.onnx"
-        dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda:0')
+        savepath_onnx = f"data/models/{args.name}-{int(time.time())}.onnx"
+        dummy_input = torch.randn(1, 1, args.img_size, args.img_size, device='cuda:0')
         torch.onnx.export(ddp_model, dummy_input, savepath_onnx)
         onnx.checker.check_model(savepath_onnx)
         print("ONNX model has been successfully saved!")
@@ -220,6 +213,16 @@ if __name__ == '__main__':
                         help='Checkpoint file to load from')
     parser.add_argument('-e', '--epochs', default=250, type=int,
                         help='Number of epochs to use')
+    parser.add_argument('--no-pin-mem', default=False, type=bool, action='store_true',
+                        help="Don't use pinned memory")
+    parser.add_argument('--name', default='model', type=str,
+                        help='Name to save model (no file extension)')
+    parser.add_argument('--checkpoint-dir', default=None, type=str,
+                        help='Checkpoint directory')
+    parser.add_argument('--img-size', default=256, type=int,
+                        help='Single sided image resolution')
+    parser.add_argument('--batch-size', default=32, type=int,
+                        help='Batch size to use for training')
     args = parser.parse_args()
     args.world_size = args.gpus * args.nodes
 
@@ -227,20 +230,23 @@ if __name__ == '__main__':
     os.environ['MASTER_PORT'] = args.port
 
     print("Importing Arrays")
-    if not os.path.exists(f"data/arrays/X_train_{IMAGE_SIZE}.npy"):
+    if not os.path.exists(f"data/arrays/X_train_{args.img_size}.npy"):
         print("Arrays not found, generating...")
         preprocessor = PreprocessImages("/data/ambouk3/NIH-X-Ray-Dataset",
-                                        IMAGE_SIZE)
+                                        args.img_size)
         (X_train, y_train), (X_test, y_test) = preprocessor()
 
     else:
-        X_train = np.load(open(f"data/arrays/X_train_{IMAGE_SIZE}.npy", "rb"))
-        y_train = np.load(open(f"data/arrays/y_train_{IMAGE_SIZE}.npy", "rb"))
-        X_test = np.load(open(f"data/arrays/X_test_{IMAGE_SIZE}.npy", "rb"))
-        y_test = np.load(open(f"data/arrays/y_test_{IMAGE_SIZE}.npy", "rb"))
+        X_train = np.load(open(f"data/arrays/X_train_{args.img_size}.npy", "rb"))
+        y_train = np.load(open(f"data/arrays/y_train_{args.img_size}.npy", "rb"))
+        X_test = np.load(open(f"data/arrays/X_test_{args.img_size}.npy", "rb"))
+        y_test = np.load(open(f"data/arrays/y_test_{args.img_size}.npy", "rb"))
 
-    if not os.path.exists(CHECKPOINT_DIR):
-        os.mkdir(CHECKPOINT_DIR)
+    if not args.checkpoint_dir:
+        args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(time.time())}/"
+
+    if not os.path.exists(args.checkpoint_dir):
+        os.mkdir(args.checkpoint_dir)
 
     # Convert channels-last to channels-first format
     X_train = np.transpose(X_train, (0, 3, 1, 2))
@@ -268,5 +274,5 @@ if __name__ == '__main__':
 
     starttime = time.time()
 
-    args = (scaler, model, starttime, train_set, val_set, test_set, args)
-    mp.spawn(train, args=args, nprocs=NUM_GPUS, join=True)
+    func_args = (scaler, model, starttime, train_set, val_set, test_set, args)
+    mp.spawn(train, args=func_args, nprocs=args.gpus, join=True)

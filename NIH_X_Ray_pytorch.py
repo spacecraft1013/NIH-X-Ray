@@ -15,20 +15,28 @@ from tqdm import tqdm
 
 from multithreaded_preprocessing import PreprocessImages
 
-MODEL_SAVE_NAME = "densenet201_pytorch"
-IMAGE_SIZE = 256
-BATCH_SIZE = 32
-CHECKPOINT_DIR = f"data/checkpoints/{MODEL_SAVE_NAME}-{int(time.time())}/"
-
-if not os.path.exists(CHECKPOINT_DIR):
-    os.mkdir(CHECKPOINT_DIR)
-
 parser = argparse.ArgumentParser()
 parser.add_argument('-c', '--checkpoint', default=None, type=str,
                     help='Checkpoint file to load from')
 parser.add_argument('-e', '--epochs', default=250, type=int,
                     help='Number of epochs to use')
+parser.add_argument('--no-pin-mem', default=False, type=bool, action='store_true',
+                    help="Don't use pinned memory")
+parser.add_argument('--name', default='model', type=str,
+                    help='Name to save model (no file extension)')
+parser.add_argument('--checkpoint-dir', default=None, type=str,
+                    help='Checkpoint directory')
+parser.add_argument('--img-size', default=256, type=int,
+                    help='Single sided image resolution')
+parser.add_argument('--batch-size', default=32, type=int,
+                    help='Batch size to use for training')
 args = parser.parse_args()
+
+if not args.checkpoint_dir:
+    args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(time.time())}/"
+
+if not os.path.exists(args.checkpoint_dir):
+    os.mkdir(args.checkpoint_dir)
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
@@ -37,16 +45,16 @@ else:
     device = torch.device('cpu')
 
 print("Importing Arrays")
-if not os.path.exists(f"data/arrays/X_train_{IMAGE_SIZE}.npy"):
+if not os.path.exists(f"data/arrays/X_train_{args.img_size}.npy"):
     print("Arrays not found, generating...")
-    preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data", IMAGE_SIZE)
+    preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data", args.img_size)
     (X_train, y_train), (X_test, y_test) = preprocessor()
 
 else:
-    X_train = np.load(open(f"data/arrays/X_train_{IMAGE_SIZE}.npy", "rb"))
-    y_train = np.load(open(f"data/arrays/y_train_{IMAGE_SIZE}.npy", "rb"))
-    X_test = np.load(open(f"data/arrays/X_test_{IMAGE_SIZE}.npy", "rb"))
-    y_test = np.load(open(f"data/arrays/y_test_{IMAGE_SIZE}.npy", "rb"))
+    X_train = np.load(open(f"data/arrays/X_train_{args.img_size}.npy", "rb"))
+    y_train = np.load(open(f"data/arrays/y_train_{args.img_size}.npy", "rb"))
+    X_test = np.load(open(f"data/arrays/X_test_{args.img_size}.npy", "rb"))
+    y_test = np.load(open(f"data/arrays/y_test_{args.img_size}.npy", "rb"))
 
 # Convert channels-last to channels-first format
 X_train = np.transpose(X_train, (0, 3, 1, 2))
@@ -79,18 +87,18 @@ dataset = TensorDataset(X_train, y_train)
 train_set, val_set = random_split(dataset, [70000, 16524])
 test_set = TensorDataset(X_test, y_test)
 traindata = DataLoader(train_set, shuffle=True,
-                       pin_memory=True, batch_size=BATCH_SIZE)
+                       pin_memory=(not args.no_pin_mem), batch_size=args.batch_size)
 valdata = DataLoader(val_set, shuffle=True,
-                     pin_memory=True, batch_size=BATCH_SIZE)
+                     pin_memory=(not args.no_pin_mem), batch_size=args.batch_size)
 testdata = DataLoader(test_set, shuffle=True,
-                      pin_memory=True, batch_size=BATCH_SIZE)
+                      pin_memory=(not args.no_pin_mem), batch_size=args.batch_size)
 
 starttime = time.time()
 
 best_model_wts = copy.deepcopy(model.state_dict())
 
-writer = SummaryWriter("data/logs", comment=MODEL_SAVE_NAME)
-dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda:0')
+writer = SummaryWriter("data/logs", comment=args.name)
+dummy_input = torch.randn(1, 1, args.img_size, args.img_size, device='cuda:0')
 writer.add_graph(model, dummy_input)
 writer.flush()
 scaler = GradScaler()
@@ -161,7 +169,7 @@ for epoch in range(args.epochs):
     writer.add_scalars('MSE', {'Training': epoch_mse, 'Validation': val_mse}, epoch+1)
     writer.flush()
 
-    checkpoint_path = os.path.join(CHECKPOINT_DIR,
+    checkpoint_path = os.path.join(args.checkpoint_dir,
                                    f"checkpoint-{epoch:03d}.pth")
     torch.save(model.state_dict(), checkpoint_path)
     print(f"Checkpoint saved to checkpoint-{epoch:03d}.pth\n")
@@ -192,15 +200,15 @@ for index, (inputs, labels) in enumerate(progressbar):
     progressbar.refresh()
 
 print("Saving model weights")
-savepath = f"data/models/{MODEL_SAVE_NAME}-{int(time.time())}.pth"
-savepath_weights = f"data/models/{MODEL_SAVE_NAME}-{int(time.time())}_weights.pth"
+savepath = f"data/models/{args.name}-{int(time.time())}.pth"
+savepath_weights = f"data/models/{args.name}-{int(time.time())}_weights.pth"
 torch.save(model.state_dict(), savepath_weights)
 torch.save(model, savepath)
 print("Model saved!\n")
 
 print("Saving ONNX file")
-savepath_onnx = f"data/models/{MODEL_SAVE_NAME}-{int(time.time())}.onnx"
-dummy_input = torch.randn(1, 1, IMAGE_SIZE, IMAGE_SIZE, device='cuda:0')
+savepath_onnx = f"data/models/{args.name}-{int(time.time())}.onnx"
+dummy_input = torch.randn(1, 1, args.img_size, args.img_size, device='cuda:0')
 torch.onnx.export(model, dummy_input, savepath_onnx)
 onnx.checker.check_model(savepath_onnx)
 print("ONNX model has been successfully saved!")
