@@ -131,7 +131,7 @@ for epoch in range(args.epochs):
         progressbar.set_description(f'Loss: {running_loss/(index+1):.5f}, MSE: {running_mse/(index+1):.5f}')
         progressbar.refresh()
 
-        scheduler.step(loss)
+        scheduler.step(mse)
 
     epoch_loss = running_loss / len(traindata)
     epoch_mse = running_mse / len(traindata)

@@ -95,7 +95,7 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
                 print(f'{index+1}/{len(traindata)} Loss: {running_loss/(index+1):.5f}, \
 MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
 
-            scheduler.step(loss)
+            scheduler.step(mse)
         epoch_loss = running_loss / len(traindata)
         epoch_mse = running_mse / len(traindata)
         print()
