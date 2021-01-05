@@ -21,7 +21,7 @@ parser.add_argument('-c', '--checkpoint', default=None, type=str,
                     help='Checkpoint file to load from')
 parser.add_argument('-e', '--epochs', default=250, type=int,
                     help='Number of epochs to use')
-parser.add_argument('--no-pin-mem', default=False, type=bool, action='store_true',
+parser.add_argument('--no-pin-mem', default=False, action='store_true',
                     help="Don't use pinned memory")
 parser.add_argument('--name', default='model', type=str,
                     help='Name to save model (no file extension)')
