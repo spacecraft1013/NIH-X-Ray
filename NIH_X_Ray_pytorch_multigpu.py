@@ -4,7 +4,6 @@ import os
 import time
 
 import numpy as np
-import onnx
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -83,19 +82,18 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
                 with autocast():
                     outputs = ddp_model(inputs)
                     loss = loss_fn(outputs, labels.long())
+                    mse = mse_fn(outputs, labels.long())
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
 
             running_loss += loss.item() * inputs.size(0)
 
-            mse = mse_fn(outputs, labels.long())
             running_mse += mse.item() * inputs.size(0)
             if gpu_num == 0:
                 print(f'{index+1}/{len(traindata)} Loss: {running_loss/(index+1):.5f}, \
 MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
 
-            scheduler.step(mse)
         epoch_loss = running_loss / len(traindata)
         epoch_mse = running_mse / len(traindata)
         print()
@@ -115,10 +113,9 @@ MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end
                 with autocast():
                     outputs = ddp_model(inputs)
                     loss = loss_fn(outputs, labels.long())
+                    mse = mse_fn(outputs, labels.long())
 
             running_loss += loss.item() * inputs.size(0)
-
-            mse = mse_fn(outputs, labels.long())
             running_mse += mse.item() * inputs.size(0)
             if gpu_num == 0:
                 print(f'{index+1}/{len(valdata)} Loss: {running_loss/(index+1):.5f}, \
@@ -127,6 +124,7 @@ MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end
 
         val_loss = running_loss / len(valdata)
         val_mse = running_mse / len(valdata)
+        scheduler.step(val_mse)
 
         if epoch == 0:
             best_loss = val_loss
@@ -161,6 +159,7 @@ MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end
 
     ddp_model.eval()
     running_loss = 0.0
+    running_mse = 0.0
 
     if gpu_num == 0:
         print('Testing')
@@ -173,10 +172,13 @@ MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end
             with autocast():
                 outputs = ddp_model(inputs)
                 loss = loss_fn(outputs, labels.long())
+                mse = mse_fn(outputs, labels.long())
 
         running_loss += loss.item() * inputs.size(0)
+        running_mse += mse.item() * inputs.size(0)
         if gpu_num == 0:
-            print(f'{index+1}/{len(testdata)} Loss: {running_loss/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
+            print(f'{index+1}/{len(testdata)} Loss: {running_loss/(index+1):.5f}, \
+MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
     print()
 
     if rank == 0:

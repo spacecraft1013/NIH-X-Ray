@@ -4,7 +4,6 @@ import os
 import time
 
 import numpy as np
-import onnx
 import torch
 import torch.nn as nn
 from torch.cuda.amp import GradScaler, autocast
@@ -121,17 +120,15 @@ for epoch in range(args.epochs):
             with autocast():
                 outputs = model(inputs)
                 loss = loss_fn(outputs, labels.long())
+                mse = mse_fn(outputs, labels.long())
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
 
         running_loss += loss.item() * inputs.size(0)
-        mse = mse_fn(outputs, labels.long())
         running_mse += mse.item * inputs.size(0)
         progressbar.set_description(f'Loss: {running_loss/(index+1):.5f}, MSE: {running_mse/(index+1):.5f}')
         progressbar.refresh()
-
-        scheduler.step(mse)
 
     epoch_loss = running_loss / len(traindata)
     epoch_mse = running_mse / len(traindata)
@@ -150,6 +147,7 @@ for epoch in range(args.epochs):
             with autocast():
                 outputs = model(inputs)
                 loss = loss_fn(outputs, labels.long())
+                mse = mse_fn(outputs, labels.long())
 
         running_loss += loss.item() * inputs.size(0)
         progressbar.set_description(f'Val loss: {running_loss/(index+1):.5f}, Val MSE: {running_mse/(index+1):.5f}')
@@ -157,6 +155,7 @@ for epoch in range(args.epochs):
 
     val_loss = running_loss / len(valdata)
     val_mse = running_mse / len(valdata)
+    scheduler.step(val_mse)
 
     if epoch == 0:
         best_loss = val_loss
@@ -183,6 +182,7 @@ print(f"Training complete in {time_elapsed // 3600}h \
 model.load_state_dict(best_model_wts)
 model.eval()
 running_loss = 0.0
+running_mse = 0.0
 
 print('Testing')
 progressbar = tqdm(testdata, dynamic_ncols=True)
@@ -194,9 +194,11 @@ for index, (inputs, labels) in enumerate(progressbar):
         with autocast():
             outputs = model(inputs)
             loss = loss_fn(outputs, labels.long())
+            mse = mse_fn(outputs, labels.long())
 
     running_loss += loss.item() * inputs.size(0)
-    progressbar.set_description(f'Test loss: {running_loss/(index+1):.5f}')
+    running_mse += mse.item() * inputs.size(0)
+    progressbar.set_description(f'Test loss: {running_loss/(index+1):.5f}, Test MSE: {running_mse/(index+1):.5f}')
     progressbar.refresh()
 
 print("Saving model weights")
