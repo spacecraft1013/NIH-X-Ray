@@ -207,10 +207,3 @@ savepath_weights = f"data/models/{args.name}-{int(time.time())}_weights.pth"
 torch.save(model.state_dict(), savepath_weights)
 torch.save(model, savepath)
 print("Model saved!\n")
-
-print("Saving ONNX file")
-savepath_onnx = f"data/models/{args.name}-{int(time.time())}.onnx"
-dummy_input = torch.randn(1, 1, args.img_size, args.img_size, device='cuda:0')
-torch.onnx.export(model, dummy_input, savepath_onnx)
-onnx.checker.check_model(savepath_onnx)
-print("ONNX model has been successfully saved!")
