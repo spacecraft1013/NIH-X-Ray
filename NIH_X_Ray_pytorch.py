@@ -120,7 +120,7 @@ for epoch in range(args.epochs):
             with autocast():
                 outputs = model(inputs)
                 loss = loss_fn(outputs, labels.long())
-                mse = mse_fn(outputs, labels.long())
+                mse = mse_fn(outputs, labels)
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
@@ -147,7 +147,7 @@ for epoch in range(args.epochs):
             with autocast():
                 outputs = model(inputs)
                 loss = loss_fn(outputs, labels.long())
-                mse = mse_fn(outputs, labels.long())
+                mse = mse_fn(outputs, labels)
 
         running_loss += loss.item() * inputs.size(0)
         progressbar.set_description(f'Val loss: {running_loss/(index+1):.5f}, Val MSE: {running_mse/(index+1):.5f}')
@@ -194,7 +194,7 @@ for index, (inputs, labels) in enumerate(progressbar):
         with autocast():
             outputs = model(inputs)
             loss = loss_fn(outputs, labels.long())
-            mse = mse_fn(outputs, labels.long())
+            mse = mse_fn(outputs, labels)
 
     running_loss += loss.item() * inputs.size(0)
     running_mse += mse.item() * inputs.size(0)

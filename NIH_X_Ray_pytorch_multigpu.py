@@ -44,7 +44,7 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
                           batch_size=args.batch_size, sampler=testsampler)
 
     if rank == 0:
-        writer = SummaryWriter(f"data/logs/{args.name}-{time.time()}")
+        writer = SummaryWriter(f"data/logs/{args.name}-{int(time.time())}")
         dummy_input = torch.randn(1, 1, args.img_size, args.img_size, device='cuda:0')
         writer.add_graph(model, dummy_input)
         writer.flush()
@@ -83,7 +83,7 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
                     outputs = ddp_model(inputs)
                     loss = loss_fn(outputs, labels.long())
                     mse = mse_fn(outputs, labels)
-                scaler.scale(mse).backward()
+                scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
 
