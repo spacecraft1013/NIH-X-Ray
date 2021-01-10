@@ -102,7 +102,7 @@ starttime = time.time()
 
 best_model_wts = copy.deepcopy(model.state_dict())
 
-writer = SummaryWriter(f"data/logs/{args.name}-{time.time()}")
+writer = SummaryWriter(f"data/logs/{args.name}-{int(time.time())}")
 dummy_input = torch.randn(1, 1, args.img_size, args.img_size, device='cuda:0')
 writer.add_graph(model, dummy_input)
 writer.flush()
