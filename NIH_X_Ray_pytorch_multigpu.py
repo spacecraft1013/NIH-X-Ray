@@ -26,6 +26,8 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
         rank=rank
     )
 
+    torch.manual_seed(args.seed)
+
     model.to(gpu_num)
     ddp_model = DDP(model, device_ids=[gpu_num])
 
@@ -218,6 +220,8 @@ if __name__ == '__main__':
                         help='Single sided image resolution')
     parser.add_argument('--batch-size', default=32, type=int,
                         help='Batch size to use for training')
+    parser.add_argument('-s', '--seed', default=0, type=int,
+                        help='Seed to use for random values')
     args = parser.parse_args()
     args.world_size = args.gpus * args.nodes
 

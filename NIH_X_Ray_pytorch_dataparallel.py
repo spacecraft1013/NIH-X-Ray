@@ -30,6 +30,8 @@ parser.add_argument('--img-size', default=256, type=int,
                     help='Single sided image resolution')
 parser.add_argument('--batch-size', default=32, type=int,
                     help='Batch size to use for training')
+parser.add_argument('-s', '--seed', default=0, type=int,
+                    help='Seed to use for random values')
 args = parser.parse_args()
 
 if not args.checkpoint_dir:
