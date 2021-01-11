@@ -51,7 +51,7 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
         writer.add_graph(model, dummy_input)
         writer.flush()
 
-    loss_fn = nn.MultiLabelMarginLoss().to(gpu_num)
+    loss_fn = nn.MultiLabelSoftMarginLoss().to(gpu_num)
     optimizer = SGD(ddp_model.parameters(), lr=1e-6, momentum=0.9)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
     mse_fn = nn.MSELoss().to(gpu_num)
@@ -90,7 +90,6 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
                 scaler.update()
 
             running_loss += loss.item() * inputs.size(0)
-
             running_mse += mse.item() * inputs.size(0)
             if gpu_num == 0:
                 print(f'{index+1}/{len(traindata)} Loss: {running_loss/(index+1):.5f}, \
@@ -173,7 +172,7 @@ MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end
         with torch.no_grad():
             with autocast():
                 outputs = ddp_model(inputs)
-                loss = loss_fn(outputs, labels.long())
+                loss = loss_fn(outputs, labels)
                 mse = mse_fn(outputs, labels)
 
         running_loss += loss.item() * inputs.size(0)

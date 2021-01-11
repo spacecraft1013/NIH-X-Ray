@@ -78,7 +78,7 @@ model.to(device)
 if args.checkpoint:
     model.load_state_dict(torch.load(args.checkpoint))
 
-loss_fn = nn.MultiLabelMarginLoss().to(device)
+loss_fn = nn.MultiLabelSoftMarginLoss().to(device)
 optimizer = SGD(model.parameters(), lr=1e-6, momentum=0.9)
 scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
 mse_fn = nn.MSELoss()
@@ -125,7 +125,7 @@ for epoch in range(args.epochs):
         with torch.set_grad_enabled(True):
             with autocast():
                 outputs = model(inputs)
-                loss = loss_fn(outputs, labels.long())
+                loss = loss_fn(outputs, labels)
                 mse = mse_fn(outputs, labels)
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -152,7 +152,7 @@ for epoch in range(args.epochs):
         with torch.no_grad():
             with autocast():
                 outputs = model(inputs)
-                loss = loss_fn(outputs, labels.long())
+                loss = loss_fn(outputs, labels)
                 mse = mse_fn(outputs, labels)
 
         running_loss += loss.item() * inputs.size(0)
@@ -200,7 +200,7 @@ for index, (inputs, labels) in enumerate(progressbar):
     with torch.no_grad():
         with autocast():
             outputs = model(inputs)
-            loss = loss_fn(outputs, labels.long())
+            loss = loss_fn(outputs, labels)
             mse = mse_fn(outputs, labels)
 
     running_loss += loss.item() * inputs.size(0)
