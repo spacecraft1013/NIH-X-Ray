@@ -19,7 +19,7 @@ from multithreaded_preprocessing import PreprocessImages
 
 def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args):
 
-    rank = args.nr * args.gpus + gpu_num
+    rank = args.node_rank * args.num_gpus + gpu_num
     dist.init_process_group(
         backend='nccl',
         world_size=args.world_size,
@@ -28,15 +28,19 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
 
     torch.manual_seed(args.seed)
 
-    model.to(gpu_num)
-    ddp_model = DDP(model, device_ids=[gpu_num])
+    if args.devices:
+        model.to(args.devices[gpu_num])
+        ddp_model = DDP(model, device_ids=[args.devices[gpu_num]])
+    else:
+        model.to(gpu_num)
+        ddp_model = DDP(model, device_ids=[gpu_num])
 
     if args.checkpoint:
         ddp_model.load_state_dict(torch.load(args.checkpoint))
 
-    trainsampler = DistributedSampler(train_set, num_replicas=args.gpus)
-    valsampler = DistributedSampler(val_set, num_replicas=args.gpus)
-    testsampler = DistributedSampler(test_set, num_replicas=args.gpus)
+    trainsampler = DistributedSampler(train_set, num_replicas=args.num_gpus)
+    valsampler = DistributedSampler(val_set, num_replicas=args.num_gpus)
+    testsampler = DistributedSampler(test_set, num_replicas=args.num_gpus)
 
     traindata = DataLoader(train_set, pin_memory=(not args.no_pin_mem),
                            batch_size=args.batch_size, sampler=trainsampler)
@@ -197,9 +201,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', '--nodes', default=1, type=int, metavar='N',
                         help='Number of nodes')
-    parser.add_argument('-g', '--gpus', default=1, type=int,
+    parser.add_argument('-g', '--num-gpus', default=1, type=int,
                         help='Number of gpus per node')
-    parser.add_argument('-nr', '--nr', default=0, type=int,
+    parser.add_argument('-nr', '--node-rank', default=0, type=int,
                         help='Node rank')
     parser.add_argument('-m', '--master', default='localhost', type=str,
                         help='IP address of master node')
@@ -221,8 +225,14 @@ if __name__ == '__main__':
                         help='Batch size to use for training')
     parser.add_argument('-s', '--seed', default=0, type=int,
                         help='Seed to use for random values')
+    parser.add_argument('--devices', default=None, nargs='+',
+                        help='GPU IDs to train on')
     args = parser.parse_args()
-    args.world_size = args.gpus * args.nodes
+    args.world_size = args.num_gpus * args.nodes
+
+    if args.devices:
+        assert len(args.devices) == args.num_gpus, "Device IDs should match \
+            number of GPUs"
 
     os.environ['MASTER_ADDR'] = args.master
     os.environ['MASTER_PORT'] = args.port
@@ -273,4 +283,4 @@ if __name__ == '__main__':
     starttime = time.time()
 
     func_args = (scaler, model, starttime, train_set, val_set, test_set, args)
-    mp.spawn(train, args=func_args, nprocs=args.gpus, join=True)
+    mp.spawn(train, args=func_args, nprocs=args.num_gpus, join=True)

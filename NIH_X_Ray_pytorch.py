@@ -31,6 +31,8 @@ parser.add_argument('--batch-size', default=32, type=int,
                     help='Batch size to use for training')
 parser.add_argument('-s', '--seed', default=0, type=int,
                     help='Seed to use for random values')
+parser.add_argument('--device', default=0, type=int,
+                    help='GPU ID to train on')
 args = parser.parse_args()
 
 torch.manual_seed(args.seed)
@@ -40,12 +42,6 @@ if not args.checkpoint_dir:
 
 if not os.path.exists(args.checkpoint_dir):
     os.mkdir(args.checkpoint_dir)
-
-if torch.cuda.is_available():
-    device = torch.device("cuda:0")
-else:
-    print("GPU not found, using CPU")
-    device = torch.device('cpu')
 
 print("Importing Arrays")
 if not os.path.exists(f"data/arrays/X_train_{args.img_size}.npy"):
@@ -72,11 +68,11 @@ model.classifier = nn.Sequential(
     nn.Sigmoid()
 )
 
-model.to(device)
+model.to(args.device)
 if args.checkpoint:
     model.load_state_dict(torch.load(args.checkpoint))
 
-loss_fn = nn.MultiLabelSoftMarginLoss().to(device)
+loss_fn = nn.MultiLabelSoftMarginLoss().to(args.device)
 optimizer = SGD(model.parameters(), lr=1e-6, momentum=0.9)
 scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
 mse_fn = nn.MSELoss()
@@ -101,7 +97,8 @@ starttime = time.time()
 best_model_wts = copy.deepcopy(model.state_dict())
 
 writer = SummaryWriter(f"data/logs/{args.name}-{int(time.time())}")
-dummy_input = torch.randn(1, 1, args.img_size, args.img_size, device='cuda:0')
+dummy_input_shape = (1, 1, args.img_size, args.img_size)
+dummy_input = torch.randn(*dummy_input_shape, device=args.device)
 writer.add_graph(model, dummy_input)
 writer.flush()
 scaler = GradScaler()
@@ -115,7 +112,7 @@ for epoch in range(args.epochs):
     progressbar = tqdm(traindata, unit='steps', dynamic_ncols=True)
     for index, (inputs, labels) in enumerate(progressbar):
 
-        inputs, labels = inputs.to(device), labels.to(device)
+        inputs, labels = inputs.to(args.device), labels.to(args.device)
 
         model.train()
         optimizer.zero_grad()
@@ -145,7 +142,7 @@ for epoch in range(args.epochs):
     progressbar = tqdm(valdata, unit='steps', dynamic_ncols=True)
     for index, (inputs, labels) in enumerate(progressbar):
 
-        inputs, labels = inputs.to(device), labels.to(device)
+        inputs, labels = inputs.to(args.device), labels.to(args.device)
 
         with torch.no_grad():
             with autocast():
@@ -193,7 +190,7 @@ print('Testing')
 progressbar = tqdm(testdata, dynamic_ncols=True)
 for index, (inputs, labels) in enumerate(progressbar):
 
-    inputs, labels = inputs.to(device), labels.to(device)
+    inputs, labels = inputs.to(args.device), labels.to(args.device)
 
     with torch.no_grad():
         with autocast():
