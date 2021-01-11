@@ -130,7 +130,7 @@ for epoch in range(args.epochs):
             scaler.update()
 
         running_loss += loss.item() * inputs.size(0)
-        running_mse += mse.item * inputs.size(0)
+        running_mse += mse.item() * inputs.size(0)
         progressbar.set_description(f'Loss: {running_loss/(index+1):.5f}, MSE: {running_mse/(index+1):.5f}')
         progressbar.refresh()
 
@@ -154,6 +154,7 @@ for epoch in range(args.epochs):
                 mse = mse_fn(outputs, labels)
 
         running_loss += loss.item() * inputs.size(0)
+        running_mse += mse.item() * inputs.size(0)
         progressbar.set_description(f'Val loss: {running_loss/(index+1):.5f}, Val MSE: {running_mse/(index+1):.5f}')
         progressbar.refresh()
 
