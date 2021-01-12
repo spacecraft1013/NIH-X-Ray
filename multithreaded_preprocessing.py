@@ -36,19 +36,15 @@ class PreprocessImages:
     -------
     start()
         Starts the multithreaded preprocessing of the dataset
-    fourier(image)
-        Returns a Fourier transform of the image
-    edgedetect(image, radius)
-        Runs an edge detection algorithm on image, with radius being
-        the pixel radius of the high-pass filter used for the detection
     """
 
-    def __init__(self, dataset_dir: str, image_size: int = 256, **kwargs):
+    def __init__(self, dataset_dir: str, image_size: int = 256):
         """
         Constructs the image_size and dataset_dir attributes and loads data
         """
         self.image_size = image_size
         self.dataset_dir = dataset_dir
+        self.resizetuple = (-1, image_size, image_size, 1)
         self.csv_data, self.train_list, self.test_list \
             = self._load_initial_data()
 
@@ -88,48 +84,6 @@ class PreprocessImages:
             if name in files:
                 return os.path.join(root, name)
 
-    def fourier(self, image: np.ndarray) -> np.ndarray:
-        """Does a Discrete Fourier Transform on the input image
-
-        Args:
-            image (np.ndarray): Input image
-
-        Returns:
-            np.ndarray: Fourier Transformed Image
-        """
-        dft = cv2.dft(np.float32(image), flags=cv2.DFT_COMPLEX_OUTPUT)
-        dft_shift = np.fft.fftshift(dft)
-        return dft_shift
-
-    def edgedetect(self, image: np.ndarray, radius: int = 50) -> np.ndarray:
-        """Runs Fourier edge detection on image
-
-        Args:
-            image (np.ndarray): Input image
-            radius (int, optional): Radius of mask. Defaults to 50.
-
-        Returns:
-            np.ndarray: Edges of image
-        """
-        rows, cols, _ = image.shape
-        crow, ccol = int(rows / 2), int(cols / 2)
-
-        mask = np.ones((rows, cols, 2), np.uint8)
-
-        center = [crow, ccol]
-
-        x, y = np.ogrid[:rows, :cols]
-        mask_area = (x - center[0]) ** 2 + (y - center[1]) ** 2 <= radius**2
-        mask[mask_area] = 0
-
-        dft_shift = self.fourier(image)
-        fshift = dft_shift * mask
-
-        f_ishift = np.fft.ifftshift(fshift)
-        reversed = cv2.idft(f_ishift)
-        output = cv2.magnitude(reversed[:, :, 0], reversed[:, :, 1])
-        return output
-
     def _preprocess(self, row: list) -> tuple:
         """Preprocesses a single row of data
 
@@ -159,9 +113,8 @@ class PreprocessImages:
             img_array = cv2.resize(img_array, imagesize_tuple)
 
             multilabels = label.split("|")
-            labels = [label for label in multilabels]
 
-            training_data = [img_array, labels]
+            training_data = [img_array, multilabels]
 
         elif imagename in self.test_list:
             print("Testing data: ", imagename)
@@ -171,9 +124,8 @@ class PreprocessImages:
             img_array = cv2.resize(img_array, imagesize_tuple)
 
             multilabels = label.split("|")
-            labels = [label for label in multilabels]
 
-            testing_data = [img_array, labels]
+            testing_data = [img_array, multilabels]
 
         return training_data, testing_data
 
@@ -186,7 +138,8 @@ class PreprocessImages:
         starttime = time.time()
         pool = mp.Pool(mp.cpu_count())
         results = pool.map(self._preprocess, self.csv_data.iterrows())
-        training_data, testing_data = zip(*results)
+        training_data = [result[0] for result in results if result[0] != []]
+        testing_data = [result[1] for result in results if result[1] != []]
 
         print("Combining outputs...")
 
@@ -198,9 +151,8 @@ class PreprocessImages:
         X_test = [item[0] for item in testing_data]
         y_test = [item[1] for item in testing_data]
 
-        resizetuple = (-1, self.image_size, self.image_size, 1)
-        X_train = np.array(X_train).reshape(resizetuple)
-        X_test = np.array(X_test).reshape(resizetuple)
+        X_train = np.array(X_train).reshape(self.resizetuple)
+        X_test = np.array(X_test).reshape(self.resizetuple)
 
         mlb = MultiLabelBinarizer()
         y_train = mlb.fit_transform(y_train)
