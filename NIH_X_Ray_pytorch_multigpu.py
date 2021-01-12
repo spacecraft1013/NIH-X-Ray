@@ -232,6 +232,8 @@ if __name__ == '__main__':
 
     starttime = time.time()
 
+    mp.set_sharing_strategy('file_system')
+
     if args.devices:
         assert len(args.devices) == args.num_gpus, "Device IDs should match \
             number of GPUs"
