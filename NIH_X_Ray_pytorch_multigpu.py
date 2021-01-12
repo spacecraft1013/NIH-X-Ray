@@ -50,7 +50,7 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
                           batch_size=args.batch_size, sampler=testsampler)
 
     if rank == 0:
-        writer = SummaryWriter(f"data/logs/{args.name}-{int(time.time())}")
+        writer = SummaryWriter(f"data/logs/{args.name}-{int(starttime)}")
         dummy_input = torch.randn(1, 1, args.img_size, args.img_size, device='cuda:0')
         writer.add_graph(model, dummy_input)
         writer.flush()
@@ -188,8 +188,8 @@ MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end
 
     if rank == 0:
         print("Saving model weights")
-        savepath = f"data/models/{args.name}-{int(time.time())}.pth"
-        savepath_weights = f"data/models/{args.name}-{int(time.time())}_weights.pth"
+        savepath = f"data/models/{args.name}-{int(starttime)}.pth"
+        savepath_weights = f"data/models/{args.name}-{int(starttime)}_weights.pth"
         torch.save(ddp_model.state_dict(), savepath_weights)
         torch.save(ddp_model, savepath)
         print("Model saved!\n")
@@ -230,6 +230,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.world_size = args.num_gpus * args.nodes
 
+    starttime = time.time()
+
     if args.devices:
         assert len(args.devices) == args.num_gpus, "Device IDs should match \
             number of GPUs"
@@ -251,7 +253,7 @@ if __name__ == '__main__':
         y_test = np.load(open(f"data/arrays/y_test_{args.img_size}.npy", "rb"))
 
     if not args.checkpoint_dir:
-        args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(time.time())}/"
+        args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime)}/"
 
     if not os.path.exists(args.checkpoint_dir):
         os.mkdir(args.checkpoint_dir)
@@ -279,8 +281,6 @@ if __name__ == '__main__':
     test_set = TensorDataset(X_test, y_test)
 
     scaler = GradScaler()
-
-    starttime = time.time()
 
     func_args = (scaler, model, starttime, train_set, val_set, test_set, args)
     mp.spawn(train, args=func_args, nprocs=args.num_gpus, join=True)

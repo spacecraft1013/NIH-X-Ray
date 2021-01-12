@@ -35,10 +35,12 @@ parser.add_argument('--device', default=0, type=int,
                     help='GPU ID to train on')
 args = parser.parse_args()
 
+starttime = time.time()
+
 torch.manual_seed(args.seed)
 
 if not args.checkpoint_dir:
-    args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(time.time())}/"
+    args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime)}/"
 
 if not os.path.exists(args.checkpoint_dir):
     os.mkdir(args.checkpoint_dir)
@@ -92,11 +94,9 @@ valdata = DataLoader(val_set, shuffle=True,
 testdata = DataLoader(test_set, shuffle=True,
                       pin_memory=(not args.no_pin_mem), batch_size=args.batch_size)
 
-starttime = time.time()
-
 best_model_wts = copy.deepcopy(model.state_dict())
 
-writer = SummaryWriter(f"data/logs/{args.name}-{int(time.time())}")
+writer = SummaryWriter(f"data/logs/{args.name}-{int(starttime)}")
 dummy_input_shape = (1, 1, args.img_size, args.img_size)
 dummy_input = torch.randn(*dummy_input_shape, device=args.device)
 writer.add_graph(model, dummy_input)
@@ -204,8 +204,8 @@ for index, (inputs, labels) in enumerate(progressbar):
     progressbar.refresh()
 
 print("Saving model weights")
-savepath = f"data/models/{args.name}-{int(time.time())}.pth"
-savepath_weights = f"data/models/{args.name}-{int(time.time())}_weights.pth"
+savepath = f"data/models/{args.name}-{int(starttime)}.pth"
+savepath_weights = f"data/models/{args.name}-{int(starttime)}_weights.pth"
 torch.save(model.state_dict(), savepath_weights)
 torch.save(model, savepath)
 print("Model saved!\n")
