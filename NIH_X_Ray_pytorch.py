@@ -162,9 +162,13 @@ for epoch in range(args.epochs):
     if epoch == 0:
         best_loss = val_loss
         best_model_wts = copy.deepcopy(model.state_dict())
+        path = os.path.join(args.checkpoint_dir, 'best_weights.pth')
+        torch.save(best_model_wts, path)
     elif val_loss < best_loss:
         best_loss = val_loss
         best_model_wts = copy.deepcopy(model.state_dict())
+        path = os.path.join(args.checkpoint_dir, 'best_weights.pth')
+        torch.save(best_model_wts, path)
 
     writer.add_scalars('Loss', {'Training': epoch_loss, 'Validation': val_loss}, epoch+1)
     writer.add_scalars('MSE', {'Training': epoch_mse, 'Validation': val_mse}, epoch+1)

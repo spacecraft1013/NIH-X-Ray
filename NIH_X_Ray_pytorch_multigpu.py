@@ -134,9 +134,13 @@ MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end
         if epoch == 0:
             best_loss = val_loss
             best_model_wts = copy.deepcopy(ddp_model.state_dict())
+            path = os.path.join(args.checkpoint_dir, 'best_weights.pth')
+            torch.save(best_model_wts, path)
         elif val_loss < best_loss:
             best_loss = val_loss
             best_model_wts = copy.deepcopy(ddp_model.state_dict())
+            path = os.path.join(args.checkpoint_dir, 'best_weights.pth')
+            torch.save(best_model_wts, path)
 
         if rank == 0:
             writer.add_scalars('Loss', {'Training': epoch_loss, 'Validation': val_loss}, epoch+1)
