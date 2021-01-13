@@ -17,7 +17,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 from multithreaded_preprocessing import PreprocessImages
 
-def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args):
+
+def train(gpu_num, scaler, model, starttime,
+          train_set, val_set, test_set, args):
 
     rank = args.node_rank * args.num_gpus + gpu_num
     dist.init_process_group(
@@ -51,7 +53,8 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
 
     if rank == 0:
         writer = SummaryWriter(f"data/logs/{args.name}-{int(starttime)}")
-        dummy_input = torch.randn(1, 1, args.img_size, args.img_size, device='cuda:0')
+        size_tuple = (1, 1, args.img_size, args.img_size)
+        dummy_input = torch.randn(*size_tuple, device='cuda:0')
         writer.add_graph(model, dummy_input)
         writer.flush()
 
@@ -97,7 +100,8 @@ def train(gpu_num, scaler, model, starttime, train_set, val_set, test_set, args)
             running_mse += mse.item() * inputs.size(0)
             if gpu_num == 0:
                 print(f'{index+1}/{len(traindata)} Loss: {running_loss/(index+1):.5f}, \
-MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
+MSE: {running_mse/(index+1):.5f}, \
+{(time.time()-steptime)*1000:.2f}ms/step', end='\r')
 
         epoch_loss = running_loss / len(traindata)
         epoch_mse = running_mse / len(traindata)
@@ -124,7 +128,8 @@ MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end
             running_mse += mse.item() * inputs.size(0)
             if gpu_num == 0:
                 print(f'{index+1}/{len(valdata)} Loss: {running_loss/(index+1):.5f}, \
-MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
+MSE: {running_mse/(index+1):.5f}, \
+{(time.time()-steptime)*1000:.2f}ms/step', end='\r')
         print()
 
         val_loss = running_loss / len(valdata)
@@ -143,8 +148,10 @@ MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end
             torch.save(best_model_wts, path)
 
         if rank == 0:
-            writer.add_scalars('Loss', {'Training': epoch_loss, 'Validation': val_loss}, epoch+1)
-            writer.add_scalars('MSE', {'Training': epoch_mse, 'Validation': val_mse}, epoch+1)
+            loss_data = {'Training': epoch_loss, 'Validation': val_loss}
+            mse_data = {'Training': epoch_mse, 'Validation': val_mse}
+            writer.add_scalars('Loss', loss_data, epoch+1)
+            writer.add_scalars('MSE', mse_data, epoch+1)
             writer.flush()
 
         checkpoint_path = os.path.join(args.checkpoint_dir,
@@ -187,7 +194,8 @@ MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end
         running_mse += mse.item() * inputs.size(0)
         if gpu_num == 0:
             print(f'{index+1}/{len(testdata)} Loss: {running_loss/(index+1):.5f}, \
-MSE: {running_mse/(index+1):.5f}, {(time.time()-steptime)*1000:.2f}ms/step', end='\r')
+MSE: {running_mse/(index+1):.5f}, \
+{(time.time()-steptime)*1000:.2f}ms/step', end='\r')
     print()
 
     if rank == 0:

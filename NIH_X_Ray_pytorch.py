@@ -35,6 +35,8 @@ parser.add_argument('--device', default=0, type=int,
                     help='GPU ID to train on')
 args = parser.parse_args()
 
+args.pin_mem = not args.no_pin_mem
+
 starttime = time.time()
 
 torch.manual_seed(args.seed)
@@ -48,7 +50,8 @@ if not os.path.exists(args.checkpoint_dir):
 print("Importing Arrays")
 if not os.path.exists(f"data/arrays/X_train_{args.img_size}.npy"):
     print("Arrays not found, generating...")
-    preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data", args.img_size)
+    preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data",
+                                    args.img_size)
     (X_train, y_train), (X_test, y_test) = preprocessor()
 
 else:
@@ -88,11 +91,11 @@ dataset = TensorDataset(X_train, y_train)
 train_set, val_set = random_split(dataset, [70000, 16524])
 test_set = TensorDataset(X_test, y_test)
 traindata = DataLoader(train_set, shuffle=True,
-                       pin_memory=(not args.no_pin_mem), batch_size=args.batch_size)
+                       pin_memory=args.pin_mem, batch_size=args.batch_size)
 valdata = DataLoader(val_set, shuffle=True,
-                     pin_memory=(not args.no_pin_mem), batch_size=args.batch_size)
+                     pin_memory=args.pin_mem, batch_size=args.batch_size)
 testdata = DataLoader(test_set, shuffle=True,
-                      pin_memory=(not args.no_pin_mem), batch_size=args.batch_size)
+                      pin_memory=args.pin_mem, batch_size=args.batch_size)
 
 best_model_wts = copy.deepcopy(model.state_dict())
 
@@ -128,7 +131,8 @@ for epoch in range(args.epochs):
 
         running_loss += loss.item() * inputs.size(0)
         running_mse += mse.item() * inputs.size(0)
-        progressbar.set_description(f'Loss: {running_loss/(index+1):.5f}, MSE: {running_mse/(index+1):.5f}')
+        progressbar.set_description(f'Loss: {running_loss/(index+1):.5f}, \
+MSE: {running_mse/(index+1):.5f}')
         progressbar.refresh()
 
     epoch_loss = running_loss / len(traindata)
@@ -152,7 +156,8 @@ for epoch in range(args.epochs):
 
         running_loss += loss.item() * inputs.size(0)
         running_mse += mse.item() * inputs.size(0)
-        progressbar.set_description(f'Val loss: {running_loss/(index+1):.5f}, Val MSE: {running_mse/(index+1):.5f}')
+        progressbar.set_description(f'Val loss: {running_loss/(index+1):.5f}, \
+Val MSE: {running_mse/(index+1):.5f}')
         progressbar.refresh()
 
     val_loss = running_loss / len(valdata)
@@ -170,8 +175,10 @@ for epoch in range(args.epochs):
         path = os.path.join(args.checkpoint_dir, 'best_weights.pth')
         torch.save(best_model_wts, path)
 
-    writer.add_scalars('Loss', {'Training': epoch_loss, 'Validation': val_loss}, epoch+1)
-    writer.add_scalars('MSE', {'Training': epoch_mse, 'Validation': val_mse}, epoch+1)
+    loss_data = {'Training': epoch_loss, 'Validation': val_loss}
+    mse_data = {'Training': epoch_mse, 'Validation': val_mse}
+    writer.add_scalars('Loss', loss_data, epoch+1)
+    writer.add_scalars('MSE', mse_data, epoch+1)
     writer.flush()
 
     checkpoint_path = os.path.join(args.checkpoint_dir,
@@ -183,7 +190,7 @@ writer.close()
 
 time_elapsed = time.time() - starttime
 print(f"Training complete in {time_elapsed // 3600}h \
-      {time_elapsed // 60}m {round(time_elapsed % 60)}s")
+{time_elapsed // 60}m {round(time_elapsed % 60)}s")
 
 model.load_state_dict(best_model_wts)
 model.eval()
@@ -204,7 +211,8 @@ for index, (inputs, labels) in enumerate(progressbar):
 
     running_loss += loss.item() * inputs.size(0)
     running_mse += mse.item() * inputs.size(0)
-    progressbar.set_description(f'Test loss: {running_loss/(index+1):.5f}, Test MSE: {running_mse/(index+1):.5f}')
+    progressbar.set_description(f'Test loss: {running_loss/(index+1):.5f}, \
+Test MSE: {running_mse/(index+1):.5f}')
     progressbar.refresh()
 
 print("Saving model weights")
