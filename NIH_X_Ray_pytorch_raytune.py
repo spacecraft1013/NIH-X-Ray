@@ -96,8 +96,10 @@ def train(config, args, checkpoint_dir=None):
     scaler = GradScaler()
     epoch = 0
     while True:
+        print(f"Epoch {epoch+1}")
         running_loss = 0.0
         running_mse = 0.0
+        print("Training")
         for inputs, labels in traindata:
 
             inputs, labels = inputs.to(device), labels.to(device)
@@ -120,6 +122,7 @@ def train(config, args, checkpoint_dir=None):
         running_loss = 0.0
         running_mse = 0.0
 
+        print("Validating")
         model.eval()
         for inputs, labels in valdata:
 
@@ -144,6 +147,7 @@ def train(config, args, checkpoint_dir=None):
             torch.save((model.state_dict(), optimizer.state_dict()), path)
 
         ray.tune.report(loss=val_loss, mse=val_mse, epoch=epoch)
+
 
 config = {
     'lr': ray.tune.loguniform(1e-8, 1e-1),
