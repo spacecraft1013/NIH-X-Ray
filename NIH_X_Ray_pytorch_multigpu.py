@@ -247,8 +247,7 @@ if __name__ == '__main__':
     mp.set_sharing_strategy('file_system')
 
     if args.devices:
-        assert len(args.devices) == args.num_gpus, "Device IDs should match \
-            number of GPUs"
+        args.num_gpus = len(args.devices)
 
     os.environ['MASTER_ADDR'] = args.master
     os.environ['MASTER_PORT'] = args.port
