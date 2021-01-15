@@ -96,8 +96,8 @@ def train(gpu_num, scaler, model, starttime,
                 scaler.step(optimizer)
                 scaler.update()
 
-            running_loss += loss.item() * inputs.size(0)
-            running_mse += mse.item() * inputs.size(0)
+            running_loss += loss.item()
+            running_mse += mse.item()
             if gpu_num == 0:
                 print(f'{index+1}/{len(traindata)} Loss: {running_loss/(index+1):.5f}, \
 MSE: {running_mse/(index+1):.5f}, \
@@ -124,8 +124,8 @@ MSE: {running_mse/(index+1):.5f}, \
                     loss = loss_fn(outputs, labels.long())
                     mse = mse_fn(outputs, labels)
 
-            running_loss += loss.item() * inputs.size(0)
-            running_mse += mse.item() * inputs.size(0)
+            running_loss += loss.item()
+            running_mse += mse.item()
             if gpu_num == 0:
                 print(f'{index+1}/{len(valdata)} Loss: {running_loss/(index+1):.5f}, \
 MSE: {running_mse/(index+1):.5f}, \
@@ -190,8 +190,8 @@ MSE: {running_mse/(index+1):.5f}, \
                 loss = loss_fn(outputs, labels)
                 mse = mse_fn(outputs, labels)
 
-        running_loss += loss.item() * inputs.size(0)
-        running_mse += mse.item() * inputs.size(0)
+        running_loss += loss.item()
+        running_mse += mse.item()
         if gpu_num == 0:
             print(f'{index+1}/{len(testdata)} Loss: {running_loss/(index+1):.5f}, \
 MSE: {running_mse/(index+1):.5f}, \

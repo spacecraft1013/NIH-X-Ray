@@ -116,8 +116,8 @@ def train(config, args, checkpoint_dir=None):
                 scaler.step(optimizer)
                 scaler.update()
 
-            running_loss += loss.item() * inputs.size(0)
-            running_mse += mse.item() * inputs.size(0)
+            running_loss += loss.item()
+            running_mse += mse.item()
 
         running_loss = 0.0
         running_mse = 0.0
@@ -134,8 +134,8 @@ def train(config, args, checkpoint_dir=None):
                     loss = loss_fn(outputs, labels)
                     mse = mse_fn(outputs, labels)
 
-            running_loss += loss.item() * inputs.size(0)
-            running_mse += mse.item() * inputs.size(0)
+            running_loss += loss.item()
+            running_mse += mse.item()
 
         val_loss = running_loss / len(valdata)
         val_mse = running_mse / len(valdata)

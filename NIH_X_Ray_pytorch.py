@@ -129,8 +129,8 @@ for epoch in range(args.epochs):
             scaler.step(optimizer)
             scaler.update()
 
-        running_loss += loss.item() * inputs.size(0)
-        running_mse += mse.item() * inputs.size(0)
+        running_loss += loss.item()
+        running_mse += mse.item()
         progressbar.set_description(f'Loss: {running_loss/(index+1):.5f}, \
 MSE: {running_mse/(index+1):.5f}')
         progressbar.refresh()
@@ -154,8 +154,8 @@ MSE: {running_mse/(index+1):.5f}')
                 loss = loss_fn(outputs, labels)
                 mse = mse_fn(outputs, labels)
 
-        running_loss += loss.item() * inputs.size(0)
-        running_mse += mse.item() * inputs.size(0)
+        running_loss += loss.item()
+        running_mse += mse.item()
         progressbar.set_description(f'Val loss: {running_loss/(index+1):.5f}, \
 Val MSE: {running_mse/(index+1):.5f}')
         progressbar.refresh()
@@ -209,8 +209,8 @@ for index, (inputs, labels) in enumerate(progressbar):
             loss = loss_fn(outputs, labels)
             mse = mse_fn(outputs, labels)
 
-    running_loss += loss.item() * inputs.size(0)
-    running_mse += mse.item() * inputs.size(0)
+    running_loss += loss.item()
+    running_mse += mse.item()
     progressbar.set_description(f'Test loss: {running_loss/(index+1):.5f}, \
 Test MSE: {running_mse/(index+1):.5f}')
     progressbar.refresh()
