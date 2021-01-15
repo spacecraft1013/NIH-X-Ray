@@ -146,7 +146,7 @@ def train(config, args, checkpoint_dir=None):
             path = os.path.join(checkpoint_dir, "checkpoint")
             torch.save((model.state_dict(), optimizer.state_dict()), path)
 
-        ray.tune.report(loss=val_loss, mse=val_mse, epoch=epoch)
+        ray.tune.report(loss=val_loss, mse=val_mse)
 
 
 config = {
