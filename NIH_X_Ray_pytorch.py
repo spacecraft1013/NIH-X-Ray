@@ -189,8 +189,11 @@ Val MSE: {running_mse/(index+1):.5f}')
 writer.close()
 
 time_elapsed = time.time() - starttime
-print(f"Training complete in {time_elapsed // 3600}h \
-{time_elapsed // 60}m {round(time_elapsed % 60)}s")
+time_hours = int(time_elapsed // 3600)
+time_minutes = int((time_elapsed-time_hours) // 60)
+time_seconds = round(time_elapsed % 60)
+print(f"Training complete in {time_hours}h \
+{time_minutes}m {time_seconds}s")
 
 model.load_state_dict(best_model_wts)
 model.eval()
