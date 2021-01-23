@@ -84,11 +84,11 @@ class PreprocessImages:
             if name in files:
                 return os.path.join(root, name)
 
-    def _preprocess(self, row: list) -> tuple:
+    def _preprocess(self, row: pd.Series) -> tuple:
         """Preprocesses a single row of data
 
         Args:
-            row (list): Row of Pandas dataframe
+            row (pd.Series): Row of Pandas dataframe
 
         Returns:
             training_data: If data is in train_list, contains np.ndarray
