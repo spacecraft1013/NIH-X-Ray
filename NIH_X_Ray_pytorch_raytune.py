@@ -172,7 +172,7 @@ analysis = ray.tune.run(
     config=config,
     num_samples=args.num_trials,
     scheduler=scheduler,
-    local_dir=f'data/logs/raytune',
+    local_dir='data/logs/raytune',
     verbose=3
 )
 
