@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.cuda.amp import GradScaler, autocast
-from torch.optim import SGD, lr_scheduler
+from torch.optim import Adamax, lr_scheduler
 from torch.utils.data import DataLoader, TensorDataset, random_split
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -78,7 +78,7 @@ if args.checkpoint:
     model.load_state_dict(torch.load(args.checkpoint))
 
 loss_fn = nn.MultiLabelSoftMarginLoss().to(args.device)
-optimizer = SGD(model.parameters(), lr=1e-6, momentum=0.9)
+optimizer = Adamax(model.parameters(), lr=1e-6)
 scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
 mse_fn = nn.MSELoss()
 
