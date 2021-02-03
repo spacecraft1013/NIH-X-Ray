@@ -115,7 +115,7 @@ class PreprocessImages:
 
             if label == 'No Finding':
                 label_binary = [0]
-            elif label == classname:
+            elif classname in label:
                 label_binary = [1]
 
             training_data = [img_array, label_binary]
@@ -129,7 +129,7 @@ class PreprocessImages:
 
             if label == 'No Finding':
                 label_binary = [0]
-            elif label == classname:
+            elif classname in label:
                 label_binary = [1]
 
             testing_data = [img_array, label_binary]
@@ -183,7 +183,7 @@ class PreprocessImages:
 
     def start_single(self, classname: str):
 
-        df = self.csv_data[self.csv_data['Finding Labels'].isin([classname, "No Finding"])]
+        df = self.csv_data[self.csv_data["Finding Labels"].str.contains(classname + "|No Finding")]
         starttime = time.time()
         pool = mp.Pool(mp.cpu_count())
         results = pool.map(partial(self._preprocess_single, classname), df.iterrows())
@@ -204,7 +204,7 @@ class PreprocessImages:
         X_test = np.array(X_test).reshape(self.resizetuple)
 
         elapsed_time = time.time() - starttime
-        print(f"Time taken: {elapsed_time // 60}m {elapsed_time % 60}s")
+        print(f"Time taken: {elapsed_time // 60}m {elapsed_time % 60:.2f}s")
 
         print("Saving Arrays")
         np.save(f"data/arrays/X_train_{self.image_size}_{classname.lower()}.npy", X_train)
@@ -244,7 +244,7 @@ class PreprocessImages:
         y_test = mlb.fit_transform(y_test)
 
         elapsed_time = time.time() - starttime
-        print(f"Time taken: {elapsed_time // 60}m {elapsed_time % 60}s")
+        print(f"Time taken: {elapsed_time // 60}m {elapsed_time % 60:.2f}s")
 
         print("Saving Arrays")
         np.save(f"data/arrays/X_train_{self.image_size}.npy", X_train)
