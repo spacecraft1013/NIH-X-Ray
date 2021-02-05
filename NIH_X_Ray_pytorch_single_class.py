@@ -1,5 +1,6 @@
 import argparse
 import copy
+import datetime
 import os
 import time
 
@@ -205,11 +206,7 @@ Val MSE: {running_mse/(index+1):.5f}, Accuracy: {running_correct/(index+1):.2%}'
 writer.close()
 
 time_elapsed = time.time() - starttime
-time_hours = int(time_elapsed // 3600)
-time_minutes = int((time_elapsed-(time_hours*3600)) // 60)
-time_seconds = round(time_elapsed % 60)
-print(f"Training complete in {time_hours}h \
-{time_minutes}m {time_seconds}s")
+print(f"Training complete in {datetime.timedelta(seconds=time_elapsed)}")
 
 model.load_state_dict(best_model_wts)
 model.eval()
