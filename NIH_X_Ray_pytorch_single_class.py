@@ -206,7 +206,7 @@ writer.close()
 
 time_elapsed = time.time() - starttime
 time_hours = int(time_elapsed // 3600)
-time_minutes = int((time_elapsed-time_hours) // 60)
+time_minutes = int((time_elapsed-(time_hours*3600)) // 60)
 time_seconds = round(time_elapsed % 60)
 print(f"Training complete in {time_hours}h \
 {time_minutes}m {time_seconds}s")
