@@ -54,7 +54,7 @@ def train(config, args, checkpoint_dir=None):
     device = torch.device("cuda")
 
     dataset = TensorDataset(X_train, y_train)
-    train_set, val_set = random_split(dataset, [70000, 16524])
+    train_set, val_set = random_split(dataset, [int(len(dataset)*0.7), int(len(dataset)*0.3)])
 
     model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet201',
                         pretrained=False)
@@ -88,9 +88,9 @@ def train(config, args, checkpoint_dir=None):
     trainsampler = DistributedSampler(train_set, num_replicas=args.num_workers)
     valsampler = DistributedSampler(val_set, num_replicas=args.num_workers)
 
-    traindata = DataLoader(train_set, pin_memory=args.pin_mem,
+    traindata = DataLoader(train_set, pin_memory=args.pin_mem, drop_last=True,
                            batch_size=config['batch_size'], sampler=trainsampler)
-    valdata = DataLoader(val_set, pin_memory=args.pin_mem,
+    valdata = DataLoader(val_set, pin_memory=args.pin_mem, drop_last=True,
                          batch_size=config['batch_size'], sampler=valsampler)
 
     scaler = GradScaler()
@@ -206,7 +206,7 @@ model.load_state_dict(best_weights)
 model.eval()
 
 test_set = TensorDataset(X_test, y_test)
-testdata = DataLoader(test_set, shuffle=True,
+testdata = DataLoader(test_set, shuffle=True, drop_last=True,
                       pin_memory=args.pin_mem, batch_size=args.batch_size)
 
 print('Testing')

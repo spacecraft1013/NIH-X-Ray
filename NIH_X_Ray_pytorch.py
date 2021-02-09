@@ -89,13 +89,13 @@ X_test = torch.Tensor(X_test)
 y_test = torch.Tensor(y_test)
 
 dataset = TensorDataset(X_train, y_train)
-train_set, val_set = random_split(dataset, [70000, 16524])
+train_set, val_set = random_split(dataset, [int(len(dataset)*0.7), int(len(dataset)*0.3)])
 test_set = TensorDataset(X_test, y_test)
-traindata = DataLoader(train_set, shuffle=True,
+traindata = DataLoader(train_set, shuffle=True, drop_last=True,
                        pin_memory=args.pin_mem, batch_size=args.batch_size)
-valdata = DataLoader(val_set, shuffle=True,
+valdata = DataLoader(val_set, shuffle=True, drop_last=True,
                      pin_memory=args.pin_mem, batch_size=args.batch_size)
-testdata = DataLoader(test_set, shuffle=True,
+testdata = DataLoader(test_set, shuffle=True, drop_last=True,
                       pin_memory=args.pin_mem, batch_size=args.batch_size)
 
 best_model_wts = copy.deepcopy(model.state_dict())
