@@ -293,7 +293,8 @@ if __name__ == '__main__':
     y_test = torch.Tensor(y_test)
 
     dataset = TensorDataset(X_train, y_train)
-    train_set, val_set = random_split(dataset, [int(len(dataset)*0.7), int(len(dataset)*0.3)])
+    train_num = int(len(dataset)*0.7)
+    train_set, val_set = random_split(dataset, [train_num, len(dataset)-train_num])
     test_set = TensorDataset(X_test, y_test)
 
     scaler = GradScaler()

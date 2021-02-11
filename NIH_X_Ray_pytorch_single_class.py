@@ -7,6 +7,7 @@ import time
 import numpy as np
 import torch
 import torch.nn as nn
+from sklearn.utils.class_weight import compute_sample_weight
 from torch.cuda.amp import GradScaler, autocast
 from torch.optim import Adamax, lr_scheduler
 from torch.utils.data import DataLoader, TensorDataset, random_split
@@ -66,6 +67,8 @@ else:
     X_test = np.load(open(f"data/arrays/X_test_{args.img_size}_{args.class_name.lower()}.npy", "rb"))
     y_test = np.load(open(f"data/arrays/y_test_{args.img_size}_{args.class_name.lower()}.npy", "rb"))
 
+class_weights = compute_sample_weight(class_weight="balanced", y=y_train)
+
 # Convert channels-last to channels-first format
 X_train = np.transpose(X_train, (0, 3, 1, 2))
 X_test = np.transpose(X_test, (0, 3, 1, 2))
@@ -94,9 +97,10 @@ X_test = torch.Tensor(X_test)
 y_test = torch.Tensor(y_test)
 
 dataset = TensorDataset(X_train, y_train)
-train_set, val_set = random_split(dataset, [int(len(dataset)*0.7), int(len(dataset)*0.3)])
+train_num = int(len(dataset)*0.7)
+train_set, val_set = random_split(dataset, [train_num, len(dataset)-train_num])
 test_set = TensorDataset(X_test, y_test)
-traindata = DataLoader(train_set, shuffle=True, drop_last=True,
+traindata = DataLoader(train_set, drop_last=True, sampler=trainsampler,
                        pin_memory=args.pin_mem, batch_size=args.batch_size)
 valdata = DataLoader(val_set, shuffle=True, drop_last=True,
                      pin_memory=args.pin_mem, batch_size=args.batch_size)

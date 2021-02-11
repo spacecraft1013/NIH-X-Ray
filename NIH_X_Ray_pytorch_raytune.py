@@ -54,7 +54,8 @@ def train(config, args, checkpoint_dir=None):
     device = torch.device("cuda")
 
     dataset = TensorDataset(X_train, y_train)
-    train_set, val_set = random_split(dataset, [int(len(dataset)*0.7), int(len(dataset)*0.3)])
+    train_num = int(len(dataset)*0.7)
+    train_set, val_set = random_split(dataset, [train_num, len(dataset)-train_num])
 
     model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet201',
                         pretrained=False)
