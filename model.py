@@ -1,5 +1,7 @@
 import keras
-def model_generator(hp):
+
+
+def model_generator_keras(hp):
 
     model = keras.models.Sequential()
 
@@ -31,7 +33,7 @@ def model_generator(hp):
     for i in range(hp.Int('denselayers', min_value=1, max_value=100, step=1)):
         model.add(keras.layers.Dense(hp.Int('dense_units', min_value=1, max_value=256, step=1), activation='relu'))
     
-    model.add(keras.layers.Dense(15, activation=hp.Choice('activation_function', values=['softmax', 'sigmoid']), name='output'))
+    model.add(keras.layers.Dense(14, activation=hp.Choice('activation_function', values=['softmax', 'sigmoid']), name='output'))
 
     model.compile(optimizer=hp.Choice('optimizer', values=['adam', 'adadelta', 'sgd']), loss='categorical_crossentropy', metrics=['accuracy'])
 

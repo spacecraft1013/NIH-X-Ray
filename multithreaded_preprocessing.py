@@ -243,6 +243,9 @@ class PreprocessImages:
         y_train = mlb.fit_transform(y_train)
         y_test = mlb.fit_transform(y_test)
 
+        y_train = np.array([i[1:] for i in y_train])
+        y_test = np.array([i[1:] for i in y_test])
+
         elapsed_time = time.time() - starttime
         print(f"Time taken: {elapsed_time // 60}m {elapsed_time % 60:.2f}s")
 
