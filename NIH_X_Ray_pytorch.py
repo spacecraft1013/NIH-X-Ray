@@ -49,8 +49,8 @@ if not args.checkpoint_dir:
 
 if args.resume_latest:
     checkpoint_dirs = os.listdir("data/checkpoints")
-    checkpoint_dirs.remove(".keep")
-    timestamps = [int(i[:-10]) for i in checkpoint_dirs]
+    checkpoint_dirs = [i for i in checkpoint_dirs if i[-10:].isdigit()]
+    timestamps = [int(i[-10:]) for i in checkpoint_dirs]
     max_index = timestamps.index(max(timestamps))
     args.checkpoint_dir = checkpoint_dirs[max_index]
     checkpoints = os.listdir(args.checkpoint_dir)
@@ -84,20 +84,20 @@ else:
 X_train = np.transpose(X_train, (0, 3, 1, 2))
 X_test = np.transpose(X_test, (0, 3, 1, 2))
 
-model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet201',
+model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121',
                        pretrained=True)
 model.features[0] = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2),
                               padding=(3, 3), bias=False)
 model.classifier = nn.Sequential(
-    nn.Linear(in_features=1920, out_features=14, bias=True),
-    nn.Sigmoid()
+    nn.Linear(in_features=1024, out_features=14, bias=True),
+    # nn.Sigmoid()
 )
 
 model.to(args.device)
 if args.checkpoint:
     model.load_state_dict(torch.load(args.checkpoint))
 
-loss_fn = nn.MultiLabelSoftMarginLoss().to(args.device)
+loss_fn = nn.BCEWithLogitsLoss().to(args.device)
 optimizer = Adamax(model.parameters(), lr=1e-6)
 scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
 mse_fn = nn.MSELoss()

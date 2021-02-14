@@ -275,8 +275,8 @@ if __name__ == '__main__':
 
     if args.resume_latest:
         checkpoint_dirs = os.listdir("data/checkpoints")
-        checkpoint_dirs.remove(".keep")
-        timestamps = [int(i[:-10]) for i in checkpoint_dirs]
+        checkpoint_dirs = [i for i in checkpoint_dirs if i[-10:].isdigit()]
+        timestamps = [int(i[-10:]) for i in checkpoint_dirs]
         max_index = timestamps.index(max(timestamps))
         args.checkpoint_dir = checkpoint_dirs[max_index]
         checkpoints = os.listdir(args.checkpoint_dir)
