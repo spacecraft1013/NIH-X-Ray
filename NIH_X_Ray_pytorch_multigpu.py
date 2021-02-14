@@ -218,6 +218,8 @@ if __name__ == '__main__':
                         help='Number of nodes')
     parser.add_argument('-g', '--num-gpus', default=1, type=int,
                         help='Number of gpus per node')
+    parser.add_argument('--resume-latest', default=False, action='store_true',
+                        help='Resume from latest checkpoint')
     parser.add_argument('-nr', '--node-rank', default=0, type=int,
                         help='Node rank')
     parser.add_argument('-m', '--master', default='localhost', type=str,
@@ -270,6 +272,23 @@ if __name__ == '__main__':
 
     if not args.checkpoint_dir:
         args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime)}/"
+
+    if args.resume_latest:
+        checkpoint_dirs = os.listdir("data/checkpoints")
+        checkpoint_dirs.remove(".keep")
+        timestamps = [int(i[:-10]) for i in checkpoint_dirs]
+        max_index = timestamps.index(max(timestamps))
+        args.checkpoint_dir = checkpoint_dirs[max_index]
+        checkpoints = os.listdir(args.checkpoint_dir)
+        checkpoint_nums = []
+        for checkpoint in checkpoints:
+            for i in checkpoint:
+                temp = []
+                if i.isdigit():
+                    temp.append(i)
+            checkpoint_nums.append(int(''.join(temp)))
+        max_index = checkpoint_nums.index(max(checkpoint_nums))
+        args.checkpoint = checkpoints[max_index]
 
     if not os.path.exists(args.checkpoint_dir):
         os.mkdir(args.checkpoint_dir)

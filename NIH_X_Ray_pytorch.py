@@ -16,6 +16,8 @@ from tqdm import tqdm
 from multithreaded_preprocessing import PreprocessImages
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--resume-latest', default=False, action='store_true',
+                    help='Resume from latest checkpoint')
 parser.add_argument('-c', '--checkpoint', default=None, type=str,
                     help='Checkpoint file to load from')
 parser.add_argument('-e', '--epochs', default=250, type=int,
@@ -45,6 +47,23 @@ torch.manual_seed(args.seed)
 if not args.checkpoint_dir:
     args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime)}/"
 
+if args.resume_latest:
+    checkpoint_dirs = os.listdir("data/checkpoints")
+    checkpoint_dirs.remove(".keep")
+    timestamps = [int(i[:-10]) for i in checkpoint_dirs]
+    max_index = timestamps.index(max(timestamps))
+    args.checkpoint_dir = checkpoint_dirs[max_index]
+    checkpoints = os.listdir(args.checkpoint_dir)
+    checkpoint_nums = []
+    for checkpoint in checkpoints:
+        for i in checkpoint:
+            temp = []
+            if i.isdigit():
+                temp.append(i)
+        checkpoint_nums.append(int(''.join(temp)))
+    max_index = checkpoint_nums.index(max(checkpoint_nums))
+    args.checkpoint = checkpoints[max_index]
+
 if not os.path.exists(args.checkpoint_dir):
     os.mkdir(args.checkpoint_dir)
 
@@ -65,20 +84,20 @@ else:
 X_train = np.transpose(X_train, (0, 3, 1, 2))
 X_test = np.transpose(X_test, (0, 3, 1, 2))
 
-model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet201',
-                       pretrained=False)
+model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121',
+                       pretrained=True)
 model.features[0] = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2),
                               padding=(3, 3), bias=False)
 model.classifier = nn.Sequential(
-    nn.Linear(in_features=1920, out_features=14, bias=True),
-    nn.Sigmoid()
+    nn.Linear(in_features=1024, out_features=14, bias=True),
+    # nn.Sigmoid()
 )
 
 model.to(args.device)
 if args.checkpoint:
     model.load_state_dict(torch.load(args.checkpoint))
 
-loss_fn = nn.MultiLabelSoftMarginLoss().to(args.device)
+loss_fn = nn.BCEWithLogitsLoss().to(args.device)
 optimizer = Adamax(model.parameters(), lr=1e-6)
 scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
 mse_fn = nn.MSELoss()
@@ -113,13 +132,13 @@ for epoch in range(args.epochs):
 
     running_loss = 0.0
     running_mse = 0.0
+    model.train()
     print('Training')
     progressbar = tqdm(traindata, unit='steps', dynamic_ncols=True)
     for index, (inputs, labels) in enumerate(progressbar):
 
         inputs, labels = inputs.to(args.device), labels.to(args.device)
 
-        model.train()
         optimizer.zero_grad()
 
         with torch.set_grad_enabled(True):

@@ -19,6 +19,8 @@ from multithreaded_preprocessing import PreprocessImages
 parser = argparse.ArgumentParser()
 parser.add_argument('class_name', type=str,
                     help='Class to train on')
+parser.add_argument('--resume-latest', default=False, action='store_true',
+                    help='Resume from latest checkpoint')
 parser.add_argument('-c', '--checkpoint', default=None, type=str,
                     help='Checkpoint file to load from')
 parser.add_argument('-e', '--epochs', default=250, type=int,
@@ -50,6 +52,23 @@ if not args.name:
 
 if not args.checkpoint_dir:
     args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime)}/"
+
+if args.resume_latest:
+    checkpoint_dirs = os.listdir("data/checkpoints")
+    checkpoint_dirs.remove(".keep")
+    timestamps = [int(i[:-10]) for i in checkpoint_dirs]
+    max_index = timestamps.index(max(timestamps))
+    args.checkpoint_dir = checkpoint_dirs[max_index]
+    checkpoints = os.listdir(args.checkpoint_dir)
+    checkpoint_nums = []
+    for checkpoint in checkpoints:
+        for i in checkpoint:
+            temp = []
+            if i.isdigit():
+                temp.append(i)
+        checkpoint_nums.append(int(''.join(temp)))
+    max_index = checkpoint_nums.index(max(checkpoint_nums))
+    args.checkpoint = checkpoints[max_index]
 
 if not os.path.exists(args.checkpoint_dir):
     os.mkdir(args.checkpoint_dir)
