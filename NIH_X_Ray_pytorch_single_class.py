@@ -86,8 +86,6 @@ else:
     X_test = np.load(open(f"data/arrays/X_test_{args.img_size}_{args.class_name.lower()}.npy", "rb"))
     y_test = np.load(open(f"data/arrays/y_test_{args.img_size}_{args.class_name.lower()}.npy", "rb"))
 
-class_weights = compute_sample_weight(class_weight="balanced", y=y_train)
-
 # Convert channels-last to channels-first format
 X_train = np.transpose(X_train, (0, 3, 1, 2))
 X_test = np.transpose(X_test, (0, 3, 1, 2))
