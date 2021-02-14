@@ -72,7 +72,7 @@ if args.resume_latest:
             checkpoint_nums.append(int(''.join(temp)))
     max_index = checkpoint_nums.index(max(checkpoint_nums))
     args.starting_epoch = max(checkpoint_nums)+1
-    args.checkpoint = checkpoints[max_index]
+    args.checkpoint = os.path.join(args.checkpoint_dir, checkpoints[max_index])
 
     log_dirs = os.listdir("data/logs")
     log_dirs = [i for i in log_dirs if i[-10:].isdigit()]
