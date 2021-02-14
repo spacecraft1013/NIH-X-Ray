@@ -52,7 +52,7 @@ def train(gpu_num, scaler, model, starttime,
                           batch_size=args.batch_size, sampler=testsampler)
 
     if rank == 0:
-        writer = SummaryWriter(f"data/logs/{args.name}-{int(starttime)}")
+        writer = SummaryWriter(args.log_dir)
         size_tuple = (1, 1, args.img_size, args.img_size)
         dummy_input = torch.randn(*size_tuple, device='cuda:0')
         writer.add_graph(model, dummy_input)
@@ -236,6 +236,8 @@ if __name__ == '__main__':
                         help='Name to save model (no file extension)')
     parser.add_argument('--checkpoint-dir', default=None, type=str,
                         help='Checkpoint directory')
+    parser.add_argument('--log-dir', default=None, type=str,
+                        help='Logging directory')
     parser.add_argument('--img-size', default=256, type=int,
                         help='Single sided image resolution')
     parser.add_argument('--batch-size', default=32, type=int,
@@ -278,17 +280,25 @@ if __name__ == '__main__':
         checkpoint_dirs = [i for i in checkpoint_dirs if i[-10:].isdigit()]
         timestamps = [int(i[-10:]) for i in checkpoint_dirs]
         max_index = timestamps.index(max(timestamps))
-        args.checkpoint_dir = checkpoint_dirs[max_index]
+        args.checkpoint_dir = f"data/checkpoints/{checkpoint_dirs[max_index]}/"
         checkpoints = os.listdir(args.checkpoint_dir)
         checkpoint_nums = []
         for checkpoint in checkpoints:
+            temp = []
             for i in checkpoint:
-                temp = []
                 if i.isdigit():
                     temp.append(i)
-            checkpoint_nums.append(int(''.join(temp)))
+            if temp:
+                checkpoint_nums.append(int(''.join(temp)))
         max_index = checkpoint_nums.index(max(checkpoint_nums))
+        args.starting_epoch = max(checkpoint_nums)+1
         args.checkpoint = checkpoints[max_index]
+
+        log_dirs = os.listdir("data/logs")
+        log_dirs = [i for i in log_dirs if i[-10:].isdigit()]
+        timestamps = [int(i[-10:]) for i in checkpoint_dirs]
+        max_index = timestamps.index(max(timestamps))
+        args.log_dir = f"data/logs/{log_dirs[max_index]}/"
 
     if not os.path.exists(args.checkpoint_dir):
         os.mkdir(args.checkpoint_dir)

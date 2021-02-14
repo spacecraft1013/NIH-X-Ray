@@ -28,6 +28,8 @@ parser.add_argument('--name', default='model', type=str,
                     help='Name to save model (no file extension)')
 parser.add_argument('--checkpoint-dir', default=None, type=str,
                     help='Checkpoint directory')
+parser.add_argument('--log-dir', default=None, type=str,
+                    help='Logging directory')
 parser.add_argument('--img-size', default=256, type=int,
                     help='Single sided image resolution')
 parser.add_argument('--batch-size', default=32, type=int,
@@ -47,22 +49,33 @@ torch.manual_seed(args.seed)
 if not args.checkpoint_dir:
     args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime)}/"
 
+if not args.log_dir:
+    args.log_dir = f"data/logs/{args.name}-{int(starttime)}/"
+
 if args.resume_latest:
     checkpoint_dirs = os.listdir("data/checkpoints")
     checkpoint_dirs = [i for i in checkpoint_dirs if i[-10:].isdigit()]
     timestamps = [int(i[-10:]) for i in checkpoint_dirs]
     max_index = timestamps.index(max(timestamps))
-    args.checkpoint_dir = checkpoint_dirs[max_index]
+    args.checkpoint_dir = f"data/checkpoints/{checkpoint_dirs[max_index]}/"
     checkpoints = os.listdir(args.checkpoint_dir)
     checkpoint_nums = []
     for checkpoint in checkpoints:
+        temp = []
         for i in checkpoint:
-            temp = []
             if i.isdigit():
                 temp.append(i)
-        checkpoint_nums.append(int(''.join(temp)))
+        if temp:
+            checkpoint_nums.append(int(''.join(temp)))
     max_index = checkpoint_nums.index(max(checkpoint_nums))
+    args.starting_epoch = max(checkpoint_nums)+1
     args.checkpoint = checkpoints[max_index]
+
+    log_dirs = os.listdir("data/logs")
+    log_dirs = [i for i in log_dirs if i[-10:].isdigit()]
+    timestamps = [int(i[-10:]) for i in checkpoint_dirs]
+    max_index = timestamps.index(max(timestamps))
+    args.log_dir = f"data/logs/{log_dirs[max_index]}/"
 
 if not os.path.exists(args.checkpoint_dir):
     os.mkdir(args.checkpoint_dir)
@@ -84,20 +97,20 @@ else:
 X_train = np.transpose(X_train, (0, 3, 1, 2))
 X_test = np.transpose(X_test, (0, 3, 1, 2))
 
-model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121',
+model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet201',
                        pretrained=True)
 model.features[0] = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2),
                               padding=(3, 3), bias=False)
 model.classifier = nn.Sequential(
-    nn.Linear(in_features=1024, out_features=14, bias=True),
-    # nn.Sigmoid()
+    nn.Linear(in_features=1920, out_features=14, bias=True),
+    nn.Sigmoid()
 )
 
 model.to(args.device)
 if args.checkpoint:
     model.load_state_dict(torch.load(args.checkpoint))
 
-loss_fn = nn.BCEWithLogitsLoss().to(args.device)
+loss_fn = nn.MultiLabelSoftMarginLoss().to(args.device)
 optimizer = Adamax(model.parameters(), lr=1e-6)
 scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
 mse_fn = nn.MSELoss()
@@ -120,13 +133,15 @@ testdata = DataLoader(test_set, shuffle=True, drop_last=True,
 
 best_model_wts = copy.deepcopy(model.state_dict())
 
-writer = SummaryWriter(f"data/logs/{args.name}-{int(starttime)}")
+writer = SummaryWriter(args.log_dir)
 dummy_input_shape = (1, 1, args.img_size, args.img_size)
 dummy_input = torch.randn(*dummy_input_shape, device=args.device)
 writer.add_graph(model, dummy_input)
 writer.flush()
 scaler = GradScaler()
 for epoch in range(args.epochs):
+    if args.starting_epoch:
+        epoch += args.starting_epoch
     print(f"Epoch {epoch+1}/{args.epochs}")
     print('='*61)
 
