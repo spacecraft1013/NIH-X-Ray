@@ -76,7 +76,7 @@ if args.resume_latest:
 
     log_dirs = os.listdir("data/logs")
     log_dirs = [i for i in log_dirs if i[-10:].isdigit()]
-    timestamps = [int(i[-10:]) for i in checkpoint_dirs]
+    timestamps = [int(i[-10:]) for i in log_dirs]
     max_index = timestamps.index(max(timestamps))
     args.log_dir = f"data/logs/{log_dirs[max_index]}/"
 
