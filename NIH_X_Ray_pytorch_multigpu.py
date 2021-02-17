@@ -249,7 +249,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     args.world_size = args.num_gpus * args.nodes
-    args.starting_epoch = 1
+    args.starting_epoch = None
 
     starttime = time.time()
 
