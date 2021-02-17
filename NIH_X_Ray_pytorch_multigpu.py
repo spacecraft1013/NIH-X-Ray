@@ -247,7 +247,9 @@ if __name__ == '__main__':
     parser.add_argument('--devices', default=None, nargs='+',
                         help='GPU IDs to train on')
     args = parser.parse_args()
+
     args.world_size = args.num_gpus * args.nodes
+    args.starting_epoch = 1
 
     starttime = time.time()
 

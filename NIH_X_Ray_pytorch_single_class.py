@@ -44,6 +44,7 @@ parser.add_argument('--device', default=0, type=int,
 args = parser.parse_args()
 
 args.pin_mem = not args.no_pin_mem
+args.starting_epoch = 1
 
 starttime = time.time()
 
