@@ -89,10 +89,11 @@ if not os.path.exists(f"data/arrays/X_train_{args.img_size}.npy"):
     (X_train, y_train), (X_test, y_test) = preprocessor()
 
 else:
-    X_train = np.load(open(f"data/arrays/X_train_{args.img_size}.npy", "rb"))
-    y_train = np.load(open(f"data/arrays/y_train_{args.img_size}.npy", "rb"))
-    X_test = np.load(open(f"data/arrays/X_test_{args.img_size}.npy", "rb"))
-    y_test = np.load(open(f"data/arrays/y_test_{args.img_size}.npy", "rb"))
+    arrays = np.load(f"data/arrays/arrays_{args.img_size}.npz")
+    X_train = arrays['X_train']
+    y_train = arrays['y_train']
+    X_test = arrays['X_test']
+    y_test = arrays['y_test']
 
 # Convert channels-last to channels-first format
 X_train = np.transpose(X_train, (0, 3, 1, 2))

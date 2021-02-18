@@ -207,10 +207,13 @@ class PreprocessImages:
         print(f"Time taken: {elapsed_time // 60}m {elapsed_time % 60:.2f}s")
 
         print("Saving Arrays")
-        np.save(f"data/arrays/X_train_{self.image_size}_{classname.lower()}.npy", X_train)
-        np.save(f"data/arrays/y_train_{self.image_size}_{classname.lower()}.npy", y_train)
-        np.save(f"data/arrays/X_test_{self.image_size}_{classname.lower()}.npy", X_test)
-        np.save(f"data/arrays/y_test_{self.image_size}_{classname.lower()}.npy", y_test)
+        np.savez(
+            f"data/arrays/arrays_{self.image_size}_{classname.lower()}.npz",
+            X_train=X_train,
+            y_train=y_train,
+            X_test=X_test,
+            y_test=y_test
+        )
 
         return (X_train, y_train), (X_test, y_test)
 
@@ -250,10 +253,13 @@ class PreprocessImages:
         print(f"Time taken: {elapsed_time // 60}m {elapsed_time % 60:.2f}s")
 
         print("Saving Arrays")
-        np.save(f"data/arrays/X_train_{self.image_size}.npy", X_train)
-        np.save(f"data/arrays/y_train_{self.image_size}.npy", y_train)
-        np.save(f"data/arrays/X_test_{self.image_size}.npy", X_test)
-        np.save(f"data/arrays/y_test_{self.image_size}.npy", y_test)
+        np.savez(
+            f"data/arrays/arrays_{self.image_size}.npz",
+            X_train=X_train,
+            y_train=y_train,
+            X_test=X_test,
+            y_test=y_test
+        )
 
         return (X_train, y_train), (X_test, y_test)
 
