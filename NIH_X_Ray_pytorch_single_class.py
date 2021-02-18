@@ -211,12 +211,10 @@ Val MSE: {running_mse/(index+1):.5f}, Accuracy: {running_correct/(index+1):.2%}'
     val_accuracy = running_correct / len(traindata)
     scheduler.step(val_mse)
 
-    if epoch == 0:
+    if 'best_loss' not in locals():
         best_loss = val_loss
-        best_model_wts = copy.deepcopy(model.state_dict())
-        path = os.path.join(args.checkpoint_dir, 'best_weights.pth')
-        torch.save(best_model_wts, path)
-    elif val_loss < best_loss:
+
+    if val_loss < best_loss:
         best_loss = val_loss
         best_model_wts = copy.deepcopy(model.state_dict())
         path = os.path.join(args.checkpoint_dir, 'best_weights.pth')
