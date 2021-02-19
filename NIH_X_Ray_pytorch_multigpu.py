@@ -44,11 +44,11 @@ def train(gpu_num, scaler, model, starttime,
     valsampler = DistributedSampler(val_set, num_replicas=args.num_gpus)
     testsampler = DistributedSampler(test_set, num_replicas=args.num_gpus)
 
-    traindata = DataLoader(train_set, pin_memory=(not args.no_pin_mem), drop_last=True,
+    traindata = DataLoader(train_set, pin_memory=args.pin_mem, drop_last=True,
                            batch_size=args.batch_size, sampler=trainsampler)
-    valdata = DataLoader(val_set, pin_memory=(not args.no_pin_mem), drop_last=True,
+    valdata = DataLoader(val_set, pin_memory=args.pin_mem, drop_last=True,
                          batch_size=args.batch_size, sampler=valsampler)
-    testdata = DataLoader(test_set, pin_memory=(not args.no_pin_mem), drop_last=True,
+    testdata = DataLoader(test_set, pin_memory=args.pin_mem, drop_last=True,
                           batch_size=args.batch_size, sampler=testsampler)
 
     if rank == 0:
@@ -248,6 +248,7 @@ if __name__ == '__main__':
 
     args.world_size = args.num_gpus * args.nodes
     args.starting_epoch = None
+    args.pin_mem = not args.no_pin_mem
 
     starttime = time.time()
 
