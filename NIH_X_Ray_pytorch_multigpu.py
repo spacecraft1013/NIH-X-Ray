@@ -261,7 +261,7 @@ if __name__ == '__main__':
     os.environ['MASTER_PORT'] = args.port
 
     print("Importing Arrays")
-    if not os.path.exists(f"data/arrays/X_train_{args.img_size}.npy"):
+    if not os.path.exists(f"data/arrays/arrays_{args.img_size}.npy"):
         print("Arrays not found, generating...")
         preprocessor = PreprocessImages("/data/ambouk3/NIH-X-Ray-Dataset",
                                         args.img_size)

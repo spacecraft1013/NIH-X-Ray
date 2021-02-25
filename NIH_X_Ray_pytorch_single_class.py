@@ -85,7 +85,7 @@ if not os.path.exists(args.checkpoint_dir):
     os.mkdir(args.checkpoint_dir)
 
 print("Importing Arrays")
-if not os.path.exists(f"data/arrays/X_train_{args.img_size}_{args.class_name.lower()}.npy"):
+if not os.path.exists(f"data/arrays/arrays_{args.img_size}_{args.class_name.lower()}.npy"):
     print("Arrays not found, generating...")
     preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data",
                                     args.img_size)
