@@ -204,6 +204,9 @@ Val MSE: {running_mse/(index+1):.5f}')
 
     if 'best_loss' not in locals():
         best_loss = val_loss
+        best_model_wts = copy.deepcopy(model.state_dict())
+        path = os.path.join(args.checkpoint_dir, 'best_weights.pth')
+        torch.save(best_model_wts, path)
 
     if val_loss < best_loss:
         best_loss = val_loss
