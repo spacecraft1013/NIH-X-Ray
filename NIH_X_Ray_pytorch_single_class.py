@@ -107,7 +107,7 @@ model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet201',
 model.features[0] = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2),
                               padding=(3, 3), bias=False)
 model.classifier = nn.Sequential(
-    nn.Linear(in_features=1920, out_features=1, bias=True),
+    nn.Linear(in_features=1920, out_features=2, bias=True),
     # nn.Sigmoid()
 )
 
@@ -115,7 +115,7 @@ model.to(args.device)
 if args.checkpoint:
     model.load_state_dict(torch.load(args.checkpoint))
 
-loss_fn = nn.BCEWithLogitsLoss().to(args.device)
+loss_fn = nn.CrossEntropyLoss().to(args.device)
 optimizer = Adamax(model.parameters(), lr=1e-6)
 scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
 mse_fn = nn.MSELoss()
@@ -129,7 +129,7 @@ dataset = TensorDataset(X_train, y_train)
 train_num = int(len(dataset)*0.7)
 train_set, val_set = random_split(dataset, [train_num, len(dataset)-train_num])
 test_set = TensorDataset(X_test, y_test)
-traindata = DataLoader(train_set, drop_last=True, sampler=trainsampler,
+traindata = DataLoader(train_set, drop_last=True,
                        pin_memory=args.pin_mem, batch_size=args.batch_size)
 valdata = DataLoader(val_set, shuffle=True, drop_last=True,
                      pin_memory=args.pin_mem, batch_size=args.batch_size)
