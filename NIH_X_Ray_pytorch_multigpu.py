@@ -14,6 +14,7 @@ from torch.optim import SGD, lr_scheduler
 from torch.utils.data import DataLoader, TensorDataset, random_split
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 
 from multithreaded_preprocessing import PreprocessImages
 
@@ -79,6 +80,7 @@ def train(gpu_num, scaler, model, starttime,
 
         if gpu_num == 0:
             print('Training')
+            traindata = tqdm(traindata, unit='steps', dynamic_ncols=True)
         for index, (inputs, labels) in enumerate(traindata):
 
             steptime = time.time()
@@ -99,9 +101,9 @@ def train(gpu_num, scaler, model, starttime,
             running_loss += loss.item()
             running_mse += mse.item()
             if gpu_num == 0:
-                print(f'{index+1}/{len(traindata)} Loss: {running_loss/(index+1):.5f}, \
-MSE: {running_mse/(index+1):.5f}, \
-{(time.time()-steptime)*1000:.2f}ms/step', end='\r')
+                traindata.set_description(f'Val loss: {running_loss/(index+1):.5f}, \
+Val MSE: {running_mse/(index+1):.5f}')
+                traindata.refresh()
 
         epoch_loss = running_loss / len(traindata)
         epoch_mse = running_mse / len(traindata)
@@ -113,6 +115,7 @@ MSE: {running_mse/(index+1):.5f}, \
         ddp_model.eval()
         if gpu_num == 0:
             print('Validation')
+            valdata = tqdm(valdata, unit='steps', dynamic_ncols=True)
         for index, (inputs, labels) in enumerate(valdata):
 
             steptime = time.time()
@@ -127,9 +130,9 @@ MSE: {running_mse/(index+1):.5f}, \
             running_loss += loss.item()
             running_mse += mse.item()
             if gpu_num == 0:
-                print(f'{index+1}/{len(valdata)} Loss: {running_loss/(index+1):.5f}, \
-MSE: {running_mse/(index+1):.5f}, \
-{(time.time()-steptime)*1000:.2f}ms/step', end='\r')
+                valdata.set_description(f'Val loss: {running_loss/(index+1):.5f}, \
+Val MSE: {running_mse/(index+1):.5f}')
+                valdata.refresh()
         print()
 
         val_loss = running_loss / len(valdata)
@@ -183,6 +186,7 @@ MSE: {running_mse/(index+1):.5f}, \
 
     if gpu_num == 0:
         print('Testing')
+        testdata = tqdm(testdata, unit='steps', dynamic_ncols=True)
     for index, (inputs, labels) in enumerate(testdata):
 
         steptime = time.time()
@@ -197,9 +201,9 @@ MSE: {running_mse/(index+1):.5f}, \
         running_loss += loss.item()
         running_mse += mse.item()
         if gpu_num == 0:
-            print(f'{index+1}/{len(testdata)} Loss: {running_loss/(index+1):.5f}, \
-MSE: {running_mse/(index+1):.5f}, \
-{(time.time()-steptime)*1000:.2f}ms/step', end='\r')
+            testdata.set_description(f'Val loss: {running_loss/(index+1):.5f}, \
+Val MSE: {running_mse/(index+1):.5f}')
+            testdata.refresh()
     print()
 
     if rank == 0:
@@ -264,7 +268,7 @@ if __name__ == '__main__':
     os.environ['MASTER_PORT'] = args.port
 
     print("Importing Arrays")
-    if not os.path.exists(f"data/arrays/arrays_{args.img_size}.npy"):
+    if not os.path.exists(f"data/arrays/arrays_{args.img_size}.npz"):
         print("Arrays not found, generating...")
         preprocessor = PreprocessImages("/data/ambouk3/NIH-X-Ray-Dataset",
                                         args.img_size)
