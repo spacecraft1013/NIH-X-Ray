@@ -14,6 +14,7 @@ from torch.optim import SGD, lr_scheduler
 from torch.utils.data import DataLoader, TensorDataset, random_split
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 
 from multithreaded_preprocessing import PreprocessImages
 
@@ -79,6 +80,7 @@ def train(gpu_num, scaler, model, starttime,
 
         if gpu_num == 0:
             print('Training')
+            traindata = tqdm(traindata, unit='steps', dynamic_ncols=True)
         for index, (inputs, labels) in enumerate(traindata):
 
             steptime = time.time()
@@ -113,6 +115,7 @@ MSE: {running_mse/(index+1):.5f}, \
         ddp_model.eval()
         if gpu_num == 0:
             print('Validation')
+            valdata = tqdm(valdata, unit='steps', dynamic_ncols=True)
         for index, (inputs, labels) in enumerate(valdata):
 
             steptime = time.time()
@@ -183,6 +186,7 @@ MSE: {running_mse/(index+1):.5f}, \
 
     if gpu_num == 0:
         print('Testing')
+        testdata = tqdm(testdata, unit='steps', dynamic_ncols=True)
     for index, (inputs, labels) in enumerate(testdata):
 
         steptime = time.time()
@@ -264,7 +268,7 @@ if __name__ == '__main__':
     os.environ['MASTER_PORT'] = args.port
 
     print("Importing Arrays")
-    if not os.path.exists(f"data/arrays/arrays_{args.img_size}.npy"):
+    if not os.path.exists(f"data/arrays/arrays_{args.img_size}.npz"):
         print("Arrays not found, generating...")
         preprocessor = PreprocessImages("/data/ambouk3/NIH-X-Ray-Dataset",
                                         args.img_size)
