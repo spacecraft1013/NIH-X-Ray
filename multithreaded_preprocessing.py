@@ -1,7 +1,7 @@
+import datetime
 import multiprocessing as mp
 import os
 import random
-import datetime
 from functools import partial
 
 import cv2
