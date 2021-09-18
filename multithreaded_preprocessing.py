@@ -1,7 +1,7 @@
 import multiprocessing as mp
 import os
 import random
-import time
+import datetime
 from functools import partial
 
 import cv2
@@ -280,7 +280,7 @@ class PreprocessImages:
         data/arrays/ as X_train_{image_size}.npy, y_train_{image_size}.npy,
         X_test_{image_size}.npy, and y_test_{image_size}.npy
         """
-        starttime = time.time()
+        starttime = datetime.datetime.now()
 
         # Create multiprocessing worker pool
         with mp.Pool(mp.cpu_count()) as pool:
@@ -318,8 +318,8 @@ class PreprocessImages:
         y_train = np.array([i[1:] for i in y_train])
         y_test = np.array([i[1:] for i in y_test])
 
-        elapsed_time = time.time() - starttime
-        print(f"Time taken: {elapsed_time // 60}m {elapsed_time % 60:.2f}s")
+        endtime = datetime.datetime.now()
+        print('Time taken:', endtime - starttime)
 
         print("Saving Arrays")
 
