@@ -46,17 +46,17 @@ args.pin_mem = not args.no_pin_mem
 args.starting_epoch = None
 
 # Set original timestamp for logging/checkpoint directories
-starttime = time.time()
+starttime = datetime.datetime.now()
 
 # Set the initial seed for training
 torch.manual_seed(args.seed)
 
 # Create the checkpoint and logging directories
 if not args.checkpoint_dir:
-    args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime)}/"
+    args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime.timestamp())}/"
 
 if not args.log_dir:
-    args.log_dir = f"data/logs/{args.name}-{int(starttime)}/"
+    args.log_dir = f"data/logs/{args.name}-{int(starttime.timestamp())}/"
 
 # Find latest checkpoint/logging directory and continue training from there
 if args.resume_latest:
@@ -175,10 +175,9 @@ for epoch in range(args.epochs):
 
     # Set model to training mode
     model.train()
-    print('Training')
 
     # Create progress bar
-    progressbar = tqdm(traindata, unit='steps', dynamic_ncols=True)
+    progressbar = tqdm(traindata, desc='Training', unit='steps', dynamic_ncols=True)
 
     # Iterate over dataloader
     for index, (inputs, labels) in enumerate(progressbar):
@@ -206,7 +205,7 @@ for epoch in range(args.epochs):
         # Update running loss and mse
         running_loss += loss.item()
         running_mse += mse.item()
-        progressbar.set_description(f'Loss: {running_loss/(index+1):.5f}, \
+        progressbar.set_description(f'Training, Loss: {running_loss/(index+1):.5f}, \
 MSE: {running_mse/(index+1):.5f}')
         progressbar.refresh()
 
@@ -219,10 +218,9 @@ MSE: {running_mse/(index+1):.5f}')
 
     # Set model to evaluation mode
     model.eval()
-    print('\nValidation')
 
     # Create progress bar
-    progressbar = tqdm(valdata, unit='steps', dynamic_ncols=True)
+    progressbar = tqdm(valdata, desc="Validation", unit='steps', dynamic_ncols=True)
 
     # Iterate over dataloader
     for index, (inputs, labels) in enumerate(progressbar):
@@ -242,8 +240,8 @@ MSE: {running_mse/(index+1):.5f}')
         # Update running loss and mse
         running_loss += loss.item()
         running_mse += mse.item()
-        progressbar.set_description(f'Val loss: {running_loss/(index+1):.5f}, \
-Val MSE: {running_mse/(index+1):.5f}')
+        progressbar.set_description(f'Validation, Loss: {running_loss/(index+1):.5f}, \
+            MSE: {running_mse/(index+1):.5f}')
         progressbar.refresh()
 
     val_loss = running_loss / len(valdata)
@@ -280,8 +278,8 @@ Val MSE: {running_mse/(index+1):.5f}')
 # Close the tensorboard logger
 writer.close()
 
-time_elapsed = time.time() - starttime
-print(f"Training complete in {datetime.timedelta(seconds=time_elapsed)}")
+endtime = datetime.datetime.now()
+print(f"Training complete in {endtime - starttime}")
 
 # Load best weights
 model.load_state_dict(best_model_wts)
@@ -296,7 +294,7 @@ running_mse = 0.0
 print('Testing')
 
 # Create progress bar
-progressbar = tqdm(testdata, dynamic_ncols=True)
+progressbar = tqdm(testdata, desc="Testing", unit='steps', dynamic_ncols=True)
 
 # Iterate over dataloader
 for index, (inputs, labels) in enumerate(progressbar):
