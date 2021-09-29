@@ -1,7 +1,7 @@
 import argparse
 import copy
 import os
-import time
+import datetime
 
 import numpy as np
 import torch
@@ -79,11 +79,10 @@ def train(gpu_num, scaler, model, starttime,
         running_mse = 0.0
 
         if gpu_num == 0:
-            print('Training')
-            traindata = tqdm(traindata, unit='steps', dynamic_ncols=True)
+            traindata = tqdm(traindata, dynamic_ncols=True, desc="Training", unit_scale=args.world_size)
+
         for index, (inputs, labels) in enumerate(traindata):
 
-            steptime = time.time()
             inputs, labels = inputs.to(gpu_num), labels.to(gpu_num)
 
             ddp_model.train()
@@ -100,9 +99,9 @@ def train(gpu_num, scaler, model, starttime,
 
             running_loss += loss.item()
             running_mse += mse.item()
+
             if gpu_num == 0:
-                traindata.set_description(f'Val loss: {running_loss/(index+1):.5f}, \
-Val MSE: {running_mse/(index+1):.5f}')
+                traindata.set_description(f"Training, Loss: {running_loss/(index+1):.5f}, MSE: {running_mse/(index+1):.5f}")
                 traindata.refresh()
 
         epoch_loss = running_loss / len(traindata)
@@ -114,11 +113,9 @@ Val MSE: {running_mse/(index+1):.5f}')
 
         ddp_model.eval()
         if gpu_num == 0:
-            print('Validation')
-            valdata = tqdm(valdata, unit='steps', dynamic_ncols=True)
+            valdata = tqdm(valdata, unit='steps', dynamic_ncols=True, desc="Validation", unit_scale=args.world_size)
         for index, (inputs, labels) in enumerate(valdata):
 
-            steptime = time.time()
             inputs, labels = inputs.to(rank), labels.to(rank)
 
             with torch.no_grad():
@@ -129,11 +126,10 @@ Val MSE: {running_mse/(index+1):.5f}')
 
             running_loss += loss.item()
             running_mse += mse.item()
+
             if gpu_num == 0:
-                valdata.set_description(f'Val loss: {running_loss/(index+1):.5f}, \
-Val MSE: {running_mse/(index+1):.5f}')
+                valdata.set_description(f"Validation, Loss: {running_loss/(index+1):.5f}, MSE: {running_mse/(index+1):.5f}")
                 valdata.refresh()
-        print()
 
         val_loss = running_loss / len(valdata)
         val_mse = running_mse / len(valdata)
@@ -171,12 +167,9 @@ Val MSE: {running_mse/(index+1):.5f}')
 
     if rank == 0:
         writer.close()
-    time_elapsed = time.time() - starttime
-    time_hours = int(time_elapsed // 3600)
-    time_minutes = int((time_elapsed-time_hours) // 60)
-    time_seconds = round(time_elapsed % 60)
-    print(f"Training complete in {time_hours}h \
-    {time_minutes}m {time_seconds}s")
+    if gpu_num == 0:
+        endtime = datetime.datetime.now()
+        print(f"Training complete in {endtime - starttime}")
 
     ddp_model.load_state_dict(best_model_wts)
 
@@ -185,11 +178,9 @@ Val MSE: {running_mse/(index+1):.5f}')
     running_mse = 0.0
 
     if gpu_num == 0:
-        print('Testing')
-        testdata = tqdm(testdata, unit='steps', dynamic_ncols=True)
+        testdata = tqdm(testdata, dynamic_ncols=True, desc="Testing", unit_scale=args.world_size)
     for index, (inputs, labels) in enumerate(testdata):
 
-        steptime = time.time()
         inputs, labels = inputs.to(rank), labels.to(rank)
 
         with torch.no_grad():
@@ -200,16 +191,15 @@ Val MSE: {running_mse/(index+1):.5f}')
 
         running_loss += loss.item()
         running_mse += mse.item()
+
         if gpu_num == 0:
-            testdata.set_description(f'Val loss: {running_loss/(index+1):.5f}, \
-Val MSE: {running_mse/(index+1):.5f}')
+            testdata.set_description(f"Testing, Loss: {running_loss/(index+1):.5f}, MSE: {running_mse/(index+1):.5f}")
             testdata.refresh()
-    print()
 
     if rank == 0:
         print("Saving model weights")
-        savepath = f"data/models/{args.name}-{int(starttime)}.pth"
-        savepath_weights = f"data/models/{args.name}-{int(starttime)}_weights.pth"
+        savepath = f"data/models/{args.name}-{int(starttime.timestamp())}.pth"
+        savepath_weights = f"data/models/{args.name}-{int(starttime.timestamp())}_weights.pth"
         torch.save(ddp_model.state_dict(), savepath_weights)
         torch.save(ddp_model, savepath)
         print("Model saved!\n")
@@ -257,7 +247,7 @@ if __name__ == '__main__':
     args.starting_epoch = None
     args.pin_mem = not args.no_pin_mem
 
-    starttime = time.time()
+    starttime = datetime.datetime.now()
 
     mp.set_sharing_strategy('file_system')
 
@@ -270,7 +260,7 @@ if __name__ == '__main__':
     print("Importing Arrays")
     if not os.path.exists(f"data/arrays/arrays_{args.img_size}.npz"):
         print("Arrays not found, generating...")
-        preprocessor = PreprocessImages("/data/ambouk3/NIH-X-Ray-Dataset",
+        preprocessor = PreprocessImages("/data/ambouk3/datasets/NIH-X-Ray-Dataset",
                                         args.img_size)
         (X_train, y_train), (X_test, y_test) = preprocessor()
 
@@ -282,7 +272,10 @@ if __name__ == '__main__':
         y_test = arrays['y_test']
 
     if not args.checkpoint_dir:
-        args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime)}/"
+        args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime.timestamp())}/"
+
+    if not args.log_dir:
+        args.log_dir = f"data/logs/{args.name}-{int(starttime.timestamp())}/"
 
     if args.resume_latest:
         checkpoint_dirs = os.listdir("data/checkpoints")
