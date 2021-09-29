@@ -1,7 +1,7 @@
 import argparse
 import copy
-import os
 import datetime
+import os
 
 import numpy as np
 import torch
