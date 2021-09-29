@@ -31,12 +31,12 @@ def train(gpu_num, scaler, model, starttime,
 
     torch.manual_seed(args.seed)
 
+    proc = gpu_num
     if args.devices:
-        model.to(args.devices[gpu_num])
-        ddp_model = DDP(model, device_ids=[args.devices[gpu_num]])
-    else:
-        model.to(gpu_num)
-        ddp_model = DDP(model, device_ids=[gpu_num])
+        gpu_num = args.devices[gpu_num]
+
+    model.to(gpu_num)
+    ddp_model = DDP(model, device_ids=[gpu_num])
 
     if args.checkpoint:
         ddp_model.load_state_dict(torch.load(args.checkpoint))
@@ -67,7 +67,7 @@ def train(gpu_num, scaler, model, starttime,
     best_model_wts = copy.deepcopy(ddp_model.state_dict())
 
     for epoch in range(args.epochs):
-        if gpu_num == 0:
+        if proc == 0:
             print(f"Epoch {epoch+1}/{args.epochs}")
             print('='*61)
 
@@ -78,7 +78,7 @@ def train(gpu_num, scaler, model, starttime,
         running_loss = 0.0
         running_mse = 0.0
 
-        if gpu_num == 0:
+        if proc == 0:
             traindata = tqdm(traindata, dynamic_ncols=True, desc="Training", unit_scale=args.world_size)
 
         for index, (inputs, labels) in enumerate(traindata):
@@ -112,7 +112,7 @@ def train(gpu_num, scaler, model, starttime,
         running_mse = 0.0
 
         ddp_model.eval()
-        if gpu_num == 0:
+        if proc == 0:
             valdata = tqdm(valdata, unit='steps', dynamic_ncols=True, desc="Validation", unit_scale=args.world_size)
         for index, (inputs, labels) in enumerate(valdata):
 
@@ -127,7 +127,7 @@ def train(gpu_num, scaler, model, starttime,
             running_loss += loss.item()
             running_mse += mse.item()
 
-            if gpu_num == 0:
+            if proc == 0:
                 valdata.set_description(f"Validation, Loss: {running_loss/(index+1):.5f}, MSE: {running_mse/(index+1):.5f}")
                 valdata.refresh()
 
@@ -167,7 +167,7 @@ def train(gpu_num, scaler, model, starttime,
 
     if rank == 0:
         writer.close()
-    if gpu_num == 0:
+    if proc == 0:
         endtime = datetime.datetime.now()
         print(f"Training complete in {endtime - starttime}")
 
@@ -177,7 +177,7 @@ def train(gpu_num, scaler, model, starttime,
     running_loss = 0.0
     running_mse = 0.0
 
-    if gpu_num == 0:
+    if proc == 0:
         testdata = tqdm(testdata, dynamic_ncols=True, desc="Testing", unit_scale=args.world_size)
     for index, (inputs, labels) in enumerate(testdata):
 
@@ -192,7 +192,7 @@ def train(gpu_num, scaler, model, starttime,
         running_loss += loss.item()
         running_mse += mse.item()
 
-        if gpu_num == 0:
+        if proc == 0:
             testdata.set_description(f"Testing, Loss: {running_loss/(index+1):.5f}, MSE: {running_mse/(index+1):.5f}")
             testdata.refresh()
 
