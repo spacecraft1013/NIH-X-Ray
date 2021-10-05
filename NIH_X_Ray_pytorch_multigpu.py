@@ -19,10 +19,10 @@ from tqdm import tqdm
 from multithreaded_preprocessing import PreprocessImages
 
 
-def train(gpu_num, scaler, model, starttime,
+def train(proc, scaler, model, starttime,
           train_set, val_set, test_set, args):
 
-    rank = args.node_rank * args.num_gpus + gpu_num
+    rank = args.node_rank * args.num_gpus + proc
     dist.init_process_group(
         backend='nccl',
         world_size=args.world_size,
@@ -31,9 +31,10 @@ def train(gpu_num, scaler, model, starttime,
 
     torch.manual_seed(args.seed)
 
-    proc = gpu_num
     if args.devices:
-        gpu_num = args.devices[gpu_num]
+        gpu_num = args.devices[proc]
+    else:
+        gpu_num = proc
 
     model.to(gpu_num)
     ddp_model = DDP(model, device_ids=[gpu_num])
