@@ -230,7 +230,7 @@ class PreprocessImages:
         # Filter metadata csv to only contain images that either have the class or no finding
         df = self.csv_data[self.csv_data["Finding Labels"].str.contains(classname + "|No Finding")]
 
-        starttime = time.time()
+        starttime = datetime.datetime.now()
 
         # Create multiprocessing worker pool
         pool = mp.Pool(mp.cpu_count())
@@ -258,8 +258,8 @@ class PreprocessImages:
         X_train = np.array(X_train).reshape(self.resizetuple)
         X_test = np.array(X_test).reshape(self.resizetuple)
 
-        elapsed_time = time.time() - starttime
-        print(f"Time taken: {elapsed_time // 60}m {elapsed_time % 60:.2f}s")
+        endtime = datetime.datetime.now()
+        print('Time taken:', endtime - starttime)
 
         print("Saving Arrays")
 
