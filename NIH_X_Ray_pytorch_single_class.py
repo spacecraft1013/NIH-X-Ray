@@ -45,7 +45,7 @@ args = parser.parse_args()
 args.pin_mem = not args.no_pin_mem
 args.starting_epoch = None
 
-starttime = time.time()
+starttime = datetime.datetime.now()
 
 torch.manual_seed(args.seed)
 
@@ -55,7 +55,7 @@ if not args.name:
     args.name = "binary-" + args.class_name
 
 if not args.checkpoint_dir:
-    args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime)}/"
+    args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime.timestamp())}/"
 
 if args.resume_latest:
     checkpoint_dirs = os.listdir("data/checkpoints")
@@ -240,8 +240,8 @@ Val MSE: {running_mse/(index+1):.5f}, Accuracy: {running_correct/(index+1):.2%}'
 
 writer.close()
 
-time_elapsed = time.time() - starttime
-print(f"Training complete in {datetime.timedelta(seconds=time_elapsed)}")
+endtime = datetime.datetime.now()
+print(f"Training complete in {endtime - starttime}")
 
 model.load_state_dict(best_model_wts)
 model.eval()
@@ -270,8 +270,8 @@ Test MSE: {running_mse/(index+1):.5f}, Accuracy: {running_correct/(index+1):.2%}
     progressbar.refresh()
 
 print("Saving model weights")
-savepath = f"data/models/{args.name}-{int(starttime)}.pth"
-savepath_weights = f"data/models/{args.name}-{int(starttime)}_weights.pth"
+savepath = f"data/models/{args.name}-{int(starttime.timestamp())}.pth"
+savepath_weights = f"data/models/{args.name}-{int(starttime.timestamp())}_weights.pth"
 torch.save(model.state_dict(), savepath_weights)
 torch.save(model, savepath)
 print("Model saved!\n")
