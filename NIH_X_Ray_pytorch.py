@@ -240,7 +240,7 @@ MSE: {running_mse/(index+1):.5f}')
         running_loss += loss.item()
         running_mse += mse.item()
         progressbar.set_description(f'Validation, Loss: {running_loss/(index+1):.5f}, \
-            MSE: {running_mse/(index+1):.5f}')
+MSE: {running_mse/(index+1):.5f}')
         progressbar.refresh()
 
     val_loss = running_loss / len(valdata)
