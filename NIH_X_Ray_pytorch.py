@@ -251,14 +251,14 @@ MSE: {running_mse/(index+1):.5f}')
 
     # Initialize best loss if the variable does not exist
     if 'best_loss' not in locals():
-        best_loss = val_loss
+        best_loss = val_mse
         best_model_wts = copy.deepcopy(model.state_dict())
         path = os.path.join(args.checkpoint_dir, 'best_weights.pth')
         torch.save(best_model_wts, path)
 
     # Update the best weights and best loss if the validation loss is lower than the best loss
-    if val_loss < best_loss:
-        best_loss = val_loss
+    if val_mse < best_loss:
+        best_loss = val_mse
         best_model_wts = copy.deepcopy(model.state_dict())
         path = os.path.join(args.checkpoint_dir, 'best_weights.pth')
         torch.save(best_model_wts, path)
