@@ -321,8 +321,8 @@ Test MSE: {running_mse/(index+1):.5f}')
 
 # Save model weights
 print("Saving model weights")
-savepath = f"data/models/{args.name}-{int(starttime)}.pth"
-savepath_weights = f"data/models/{args.name}-{int(starttime)}_weights.pth"
+savepath = f"data/models/{args.name}-{int(starttime.timestamp())}.pth"
+savepath_weights = f"data/models/{args.name}-{int(starttime.timestamp())}_weights.pth"
 torch.save(model.state_dict(), savepath_weights)
 torch.save(model, savepath)
 print("Model saved!\n")
