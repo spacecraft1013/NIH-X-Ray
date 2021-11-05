@@ -312,8 +312,8 @@ if __name__ == '__main__':
     X_train = np.transpose(X_train, (0, 3, 1, 2))
     X_test = np.transpose(X_test, (0, 3, 1, 2))
 
-    model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet201',
-                           pretrained=False)
+    model = torch.hub.load('pytorch/vision:v0.11.1', 'densenet201',
+                           pretrained=True)
     model.features[0] = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2),
                                   padding=(3, 3), bias=False)
     model.classifier = nn.Sequential(

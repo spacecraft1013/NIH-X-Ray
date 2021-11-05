@@ -58,8 +58,8 @@ def train(config, args, checkpoint_dir=None):
     train_num = int(len(dataset)*0.7)
     train_set, val_set = random_split(dataset, [train_num, len(dataset)-train_num])
 
-    model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet201',
-                        pretrained=False)
+    model = torch.hub.load('pytorch/vision:v0.11.1', 'densenet201',
+                        pretrained=True)
     model.features[0] = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2),
                                 padding=(3, 3), bias=False)
     model.classifier = nn.Sequential(
