@@ -50,6 +50,8 @@ starttime = datetime.datetime.now()
 # Set the initial seed for training
 torch.manual_seed(args.seed)
 
+torch.backends.cudnn.benchmark = True
+
 # Create the checkpoint and logging directories
 if not args.checkpoint_dir:
     args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime.timestamp())}/"
@@ -185,7 +187,7 @@ for epoch in range(args.epochs):
         inputs, labels = inputs.to(args.device), labels.to(args.device)
 
         # Zero gradient for optimizer
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
 
         # Enable gradient
         with torch.set_grad_enabled(True):

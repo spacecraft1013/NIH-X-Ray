@@ -7,7 +7,6 @@ import time
 import numpy as np
 import torch
 import torch.nn as nn
-from sklearn.utils.class_weight import compute_sample_weight
 from torch.cuda.amp import GradScaler, autocast
 from torch.optim import Adamax, lr_scheduler
 from torch.utils.data import DataLoader, TensorDataset, random_split
@@ -49,6 +48,8 @@ args.starting_epoch = None
 starttime = time.time()
 
 torch.manual_seed(args.seed)
+
+torch.backends.cudnn.benchmark = True
 
 if not args.name:
     args.name = "binary-" + args.class_name
@@ -158,7 +159,7 @@ for epoch in range(args.epochs):
         inputs, labels = inputs.to(args.device), labels.to(args.device)
 
         model.train()
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
 
         with torch.set_grad_enabled(True):
             with autocast():

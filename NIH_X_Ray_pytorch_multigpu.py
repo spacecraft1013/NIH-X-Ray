@@ -10,7 +10,7 @@ import torch.multiprocessing as mp
 import torch.nn as nn
 from torch.cuda.amp import GradScaler, autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.optim import SGD, lr_scheduler
+from torch.optim import Adamax, lr_scheduler
 from torch.utils.data import DataLoader, TensorDataset, random_split
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
@@ -29,6 +29,7 @@ def train(proc, scaler, model, starttime,
         rank=rank
     )
 
+    torch.backends.cudnn.benchmark = True
     torch.manual_seed(args.seed)
 
     if args.devices:
@@ -61,7 +62,7 @@ def train(proc, scaler, model, starttime,
         writer.flush()
 
     loss_fn = nn.MultiLabelSoftMarginLoss().to(gpu_num)
-    optimizer = SGD(ddp_model.parameters(), lr=1e-6, momentum=0.9)
+    optimizer = Adamax(ddp_model.parameters(), lr=1e-6)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
     mse_fn = nn.MSELoss().to(gpu_num)
 
@@ -79,6 +80,8 @@ def train(proc, scaler, model, starttime,
         running_loss = 0.0
         running_mse = 0.0
 
+        ddp_model.train()
+
         if proc == 0:
             traindata = tqdm(traindata, dynamic_ncols=True, desc="Training", unit_scale=args.world_size)
 
@@ -86,8 +89,7 @@ def train(proc, scaler, model, starttime,
 
             inputs, labels = inputs.to(gpu_num), labels.to(gpu_num)
 
-            ddp_model.train()
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
 
             with torch.set_grad_enabled(True):
                 with autocast():

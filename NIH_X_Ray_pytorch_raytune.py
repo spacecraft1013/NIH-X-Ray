@@ -43,6 +43,7 @@ torch.manual_seed(args.seed)
 
 def train(config, args, checkpoint_dir=None):
 
+    torch.backends.cudnn.benchmark = True
     X_train = np.load(open(f"data/arrays/X_train_{args.img_size}.npy", "rb"))
     y_train = np.load(open(f"data/arrays/y_train_{args.img_size}.npy", "rb"))
 
@@ -100,13 +101,13 @@ def train(config, args, checkpoint_dir=None):
         print(f"Epoch {epoch+1}")
         running_loss = 0.0
         running_mse = 0.0
+        model.train()
         print("Training")
         for inputs, labels in traindata:
 
             inputs, labels = inputs.to(device), labels.to(device)
 
-            model.train()
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
 
             with torch.set_grad_enabled(True):
                 with autocast():
