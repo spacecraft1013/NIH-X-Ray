@@ -11,7 +11,7 @@ import torch.nn as nn
 from torch.cuda.amp import GradScaler, autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import Adamax, lr_scheduler
-from torch.utils.data import DataLoader, TensorDataset, random_split
+from torch.utils.data import DataLoader, Dataset, TensorDataset, random_split
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -19,8 +19,8 @@ from tqdm import tqdm
 from multithreaded_preprocessing import PreprocessImages
 
 
-def train(proc, scaler, model, starttime,
-          train_set, val_set, test_set, args):
+def train(proc: int, scaler: GradScaler, model: nn.Module, starttime: datetime.datetime,
+          train_set: Dataset, val_set: Dataset, test_set: Dataset, args: argparse.Namespace):
 
     rank = args.node_rank * args.num_gpus + proc
     dist.init_process_group(

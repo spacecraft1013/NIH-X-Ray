@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import datetime
 import multiprocessing as mp
 import os
 import random
 from functools import partial
+from typing import Union
 
 import cv2
 import numpy as np
@@ -39,7 +42,7 @@ class PreprocessImages:
         Starts the multithreaded preprocessing of the dataset
     """
 
-    def __init__(self, dataset_dir: str, image_size: int = 256):
+    def __init__(self, dataset_dir: str, image_size: int = 256) -> None:
         """
         Constructs the image_size and dataset_dir attributes and loads data
         """
@@ -52,11 +55,11 @@ class PreprocessImages:
         self.csv_data, self.train_list, self.test_list \
             = self._load_initial_data()
 
-    def __call__(self):
+    def __call__(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Calls self.start()"""
         return self.start()
 
-    def _load_initial_data(self):
+    def _load_initial_data(self) -> tuple[pd.DataFrame, str, str]:
         """
         Loads the initial data needed for preprocessing
 
@@ -86,14 +89,14 @@ class PreprocessImages:
 
         return csv_data, train_list, test_list
 
-    def _findimage(self, name, path):
+    def _findimage(self, name: str, path: str) -> str:
         # Finds image paths from image names
         for root, dirs, files in os.walk(path):
             if name in files:
                 return os.path.join(root, name)
 
     # Function to preprocess row for data for binary classifier with single class
-    def _preprocess_single(self, classname: str, row: pd.Series) -> tuple:
+    def _preprocess_single(self, classname: str, row: pd.Series) -> tuple[Union[tuple[np.ndarray, tuple], list[None]], Union[tuple[np.ndarray, tuple], list[None]]]:
         """Preprocesses a single row of data
 
         Args:
@@ -132,12 +135,12 @@ class PreprocessImages:
 
             # Check label for image and assign 0 or 1
             if label == 'No Finding':
-                label_binary = [0]
+                label_binary = (0,)
             elif classname in label:
-                label_binary = [1]
+                label_binary = (1,)
 
             # Add image and label to training data
-            training_data = [img_array, label_binary]
+            training_data = (img_array, label_binary)
 
         elif imagename in self.test_list:
             print("Testing data: ", imagename)
@@ -153,16 +156,16 @@ class PreprocessImages:
 
             # Check label for image and assign 0 or 1
             if label == 'No Finding':
-                label_binary = [0]
+                label_binary = (0,)
             elif classname in label:
-                label_binary = [1]
+                label_binary = (1,)
 
             # Add image and label to testing data
-            testing_data = [img_array, label_binary]
+            testing_data = (img_array, label_binary)
 
         return training_data, testing_data
 
-    def _preprocess(self, row: pd.Series) -> tuple:
+    def _preprocess(self, row: pd.Series) -> tuple[Union[tuple[np.ndarray, tuple], list[None]], Union[tuple[np.ndarray, tuple], list[None]]]:
         """Preprocesses a single row of data
 
         Args:
@@ -225,7 +228,7 @@ class PreprocessImages:
 
         return training_data, testing_data
 
-    def start_single(self, classname: str):
+    def start_single(self, classname: str) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
         # Filter metadata csv to only contain images that either have the class or no finding
         df = self.csv_data[self.csv_data["Finding Labels"].str.contains(classname + "|No Finding")]
@@ -258,6 +261,9 @@ class PreprocessImages:
         X_train = np.array(X_train).reshape(self.resizetuple)
         X_test = np.array(X_test).reshape(self.resizetuple)
 
+        y_train = np.array(y_train)
+        y_test = np.array(y_test)
+
         endtime = datetime.datetime.now()
         print('Time taken:', endtime - starttime)
 
@@ -272,9 +278,9 @@ class PreprocessImages:
             y_test=y_test
         )
 
-        return (X_train, y_train), (X_test, y_test)
+        return X_train, y_train, X_test, y_test
 
-    def start(self):
+    def start(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         Starts the multithreaded preprocessing and saves outputs to
         data/arrays/ as X_train_{image_size}.npy, y_train_{image_size}.npy,
@@ -332,7 +338,7 @@ class PreprocessImages:
             y_test=y_test
         )
 
-        return (X_train, y_train), (X_test, y_test)
+        return X_train, y_train, X_test, y_test
 
 
 if __name__ == "__main__":

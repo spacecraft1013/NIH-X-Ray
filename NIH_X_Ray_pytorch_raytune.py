@@ -41,7 +41,7 @@ args.pin_mem = not args.no_pin_mem
 torch.manual_seed(args.seed)
 
 
-def train(config, args, checkpoint_dir=None):
+def train(config: dict, args: argparse.Namespace, checkpoint_dir: str = None):
 
     torch.backends.cudnn.benchmark = True
     X_train = np.load(open(f"data/arrays/X_train_{args.img_size}.npy", "rb"))
