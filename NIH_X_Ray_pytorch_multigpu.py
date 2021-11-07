@@ -9,6 +9,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.nn as nn
 from torch.cuda.amp import GradScaler, autocast
+from torch.distributed.optim import ZeroRedundancyOptimizer
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import Adamax, lr_scheduler
 from torch.utils.data import DataLoader, Dataset, TensorDataset, random_split
@@ -62,7 +63,7 @@ def train(proc: int, scaler: GradScaler, model: nn.Module, starttime: datetime.d
         writer.flush()
 
     loss_fn = nn.MultiLabelSoftMarginLoss().to(gpu_num)
-    optimizer = Adamax(ddp_model.parameters(), lr=1e-6)
+    optimizer = ZeroRedundancyOptimizer(ddp_model.parameters(), optimizer_class=Adamax, lr=1e-6)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
     mse_fn = nn.MSELoss().to(gpu_num)
 
