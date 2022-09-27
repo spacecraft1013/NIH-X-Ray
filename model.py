@@ -1,4 +1,5 @@
 import keras
+import torch.nn
 
 
 def model_generator_keras(hp):
@@ -38,3 +39,26 @@ def model_generator_keras(hp):
     model.compile(optimizer=hp.Choice('optimizer', values=['adam', 'adadelta', 'sgd']), loss='categorical_crossentropy', metrics=['accuracy'])
 
     return model
+
+class NIHXrayModel(nn.Module):
+    def __init__(self, model_config: dict, input_size: tuple[int, int, int, int], num_classes: int = 14):
+        super().__init__()
+        self.input_size = input_size
+        self.num_classes = num_classes
+
+    def forward(self, x):
+        pass
+
+    def build_model(self):
+        layers = []
+        for i in range(self.num_blocks):
+            layers.append(self.conv_block(self.num_filters, self.kernel_size, self.padding, self.stride))
+
+    def conv_block(self, in_channels, out_channels, kernel_size, stride):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size, stride),
+            nn.ReLU(),
+            nn.Conv2d(out_channels, out_channels, kernel_size, stride),
+            nn.ReLU(),
+            nn.MaxPool2d(2)
+        )

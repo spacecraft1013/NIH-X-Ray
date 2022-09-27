@@ -18,60 +18,78 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from multithreaded_preprocessing import PreprocessImages
+from utils import Config
 
 
 def train(proc: int, scaler: GradScaler, model: nn.Module, starttime: datetime.datetime,
-          train_set: Dataset, val_set: Dataset, test_set: Dataset, args: argparse.Namespace):
+          train_set: Dataset, val_set: Dataset, test_set: Dataset, config: Config):
 
-    rank = args.node_rank * args.num_gpus + proc
+    rank = config.device_config.node_rank * config.device_config.num_gpus + proc
     dist.init_process_group(
         backend='nccl',
-        world_size=args.world_size,
+        world_size=config.world_size,
         rank=rank
     )
 
-    torch.backends.cudnn.benchmark = True
-    torch.manual_seed(args.seed)
+    torch.backends.cudnn.benchmark = config.cudnn_benchmark
+    torch.manual_seed(config.seed)
 
-    if args.devices:
-        gpu_num = args.devices[proc]
+    if config.device_config.devices:
+        gpu_num = config.device_config.devices[proc-(config.device_config.node_rank*config.device_config.num_gpus)]
     else:
-        gpu_num = proc
+        gpu_num = proc-(config.device_config.node_rank*config.device_config.num_gpus)
 
     model.to(gpu_num)
     ddp_model = DDP(model, device_ids=[gpu_num])
 
-    if args.checkpoint:
-        ddp_model.load_state_dict(torch.load(args.checkpoint))
+    if config.checkpoint:
+        ddp_model.load_state_dict(torch.load(config.checkpoint))
 
     trainsampler = DistributedSampler(train_set, num_replicas=args.num_gpus)
     valsampler = DistributedSampler(val_set, num_replicas=args.num_gpus)
     testsampler = DistributedSampler(test_set, num_replicas=args.num_gpus)
 
-    traindata = DataLoader(train_set, pin_memory=args.pin_mem, drop_last=True,
-                           batch_size=args.batch_size, sampler=trainsampler)
-    valdata = DataLoader(val_set, pin_memory=args.pin_mem, drop_last=True,
-                         batch_size=args.batch_size, sampler=valsampler)
-    testdata = DataLoader(test_set, pin_memory=args.pin_mem, drop_last=True,
-                          batch_size=args.batch_size, sampler=testsampler)
+    traindata = DataLoader(train_set, pin_memory=config.pin_mem, drop_last=True,
+                           batch_size=config.batch_size, sampler=trainsampler)
+    valdata = DataLoader(val_set, pin_memory=config.pin_mem, drop_last=True,
+                         batch_size=config.batch_size, sampler=valsampler)
+    testdata = DataLoader(test_set, pin_memory=config.pin_mem, drop_last=True,
+                          batch_size=config.batch_size, sampler=testsampler)
 
     if rank == 0:
-        writer = SummaryWriter(args.log_dir)
-        size_tuple = (1, 1, args.img_size, args.img_size)
+        writer = SummaryWriter(config.log_dir)
+        size_tuple = (1, 1, *config.img_size)
         dummy_input = torch.randn(*size_tuple, device='cuda:0')
         writer.add_graph(model, dummy_input)
         writer.flush()
 
-    loss_fn = nn.MultiLabelSoftMarginLoss().to(gpu_num)
-    optimizer = ZeroRedundancyOptimizer(ddp_model.parameters(), optimizer_class=Adamax, lr=1e-6)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
+    # Initialize loss and optimizer functions
+    if config.loss_algorithm == 'cross_entropy':
+        loss_alg = nn.CrossEntropyLoss
+    elif config.loss_algorithm == 'binary_crossentropy':
+        loss_alg = nn.BCEWithLogitsLoss
+    elif config.loss_algorithm == 'mean_squared_error':
+        loss_alg = nn.MSELoss
+    else:
+        raise ValueError("Invalid loss algorithm")
+
+    if config.optimizer == 'adamax':
+        optimizer_alg = optim.Adamax
+    elif config.optimizer == 'adam':
+        optimizer_alg = optim.Adam
+    else:
+        raise ValueError("Invalid optimizer")
+
+    loss_fn = loss_alg().to(gpu_num)
+    optimizer = ZeroRedundancyOptimizer(ddp_model.parameters(), optimizer_class=optimizer_alg, lr=config.learning_rate)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
     mse_fn = nn.MSELoss().to(gpu_num)
 
     best_model_wts = copy.deepcopy(ddp_model.state_dict())
 
-    for epoch in range(args.epochs):
+    for epoch in range(config.epochs):
         if proc == 0:
-            print(f"Epoch {epoch+1}/{args.epochs}")
+            print(f"Epoch {epoch+1}/{config.epochs}")
             print('='*61)
 
         trainsampler.set_epoch(epoch)
@@ -84,7 +102,7 @@ def train(proc: int, scaler: GradScaler, model: nn.Module, starttime: datetime.d
         ddp_model.train()
 
         if proc == 0:
-            traindata = tqdm(traindata, dynamic_ncols=True, desc="Training", unit_scale=args.world_size)
+            traindata = tqdm(traindata, dynamic_ncols=True, desc="Training", unit_scale=config.world_size)
 
         for index, (inputs, labels) in enumerate(traindata):
 
@@ -117,10 +135,10 @@ def train(proc: int, scaler: GradScaler, model: nn.Module, starttime: datetime.d
 
         ddp_model.eval()
         if proc == 0:
-            valdata = tqdm(valdata, unit='steps', dynamic_ncols=True, desc="Validation", unit_scale=args.world_size)
+            valdata = tqdm(valdata, unit='steps', dynamic_ncols=True, desc="Validation", unit_scale=config.world_size)
         for index, (inputs, labels) in enumerate(valdata):
 
-            inputs, labels = inputs.to(rank), labels.to(rank)
+            inputs, labels = inputs.to(gpu_num), labels.to(gpu_num)
 
             with torch.no_grad():
                 with autocast():
@@ -139,16 +157,10 @@ def train(proc: int, scaler: GradScaler, model: nn.Module, starttime: datetime.d
         val_mse = running_mse / len(valdata)
         scheduler.step(val_mse)
 
-        if 'best_loss' not in locals():
+        if ('best_loss' not in locals() or val_mse < best_loss) and rank == 0:
             best_loss = val_mse
             best_model_wts = copy.deepcopy(model.state_dict())
-            path = os.path.join(args.checkpoint_dir, 'best_weights.pth')
-            torch.save(best_model_wts, path)
-
-        if val_mse < best_loss:
-            best_loss = val_mse
-            best_model_wts = copy.deepcopy(model.state_dict())
-            path = os.path.join(args.checkpoint_dir, 'best_weights.pth')
+            path = os.path.join(config.checkpoint_dir, 'best_weights.pth')
             torch.save(best_model_wts, path)
 
         if rank == 0:
@@ -158,9 +170,9 @@ def train(proc: int, scaler: GradScaler, model: nn.Module, starttime: datetime.d
             writer.add_scalars('MSE', mse_data, epoch+1)
             writer.flush()
 
-        checkpoint_path = os.path.join(args.checkpoint_dir,
-                                       f"checkpoint-{epoch:03d}.pth")
         if rank == 0:
+            checkpoint_path = os.path.join(config.checkpoint_dir,
+                                        f"checkpoint-{epoch:03d}.pth")
             torch.save(ddp_model.state_dict(), checkpoint_path)
             print(f"Checkpoint saved to checkpoint-{epoch:03d}.pth\n")
 
@@ -182,7 +194,7 @@ def train(proc: int, scaler: GradScaler, model: nn.Module, starttime: datetime.d
     running_mse = 0.0
 
     if proc == 0:
-        testdata = tqdm(testdata, dynamic_ncols=True, desc="Testing", unit_scale=args.world_size)
+        testdata = tqdm(testdata, dynamic_ncols=True, desc="Testing", unit_scale=config.world_size)
     for index, (inputs, labels) in enumerate(testdata):
 
         inputs, labels = inputs.to(rank), labels.to(rank)
@@ -202,10 +214,8 @@ def train(proc: int, scaler: GradScaler, model: nn.Module, starttime: datetime.d
 
     if rank == 0:
         print("Saving model weights")
-        savepath = f"data/models/{args.name}-{int(starttime.timestamp())}.pth"
-        savepath_weights = f"data/models/{args.name}-{int(starttime.timestamp())}_weights.pth"
-        torch.save(ddp_model.state_dict(), savepath_weights)
-        torch.save(ddp_model, savepath)
+        savepath = os.path.join(config.model_dir, f"{config.name}-{int(starttime.timestamp())}_weights.pth")
+        torch.save(ddp_model.state_dict(), savepath)
         print("Model saved!\n")
 
     dist.destroy_process_group()
@@ -213,63 +223,37 @@ def train(proc: int, scaler: GradScaler, model: nn.Module, starttime: datetime.d
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-n', '--nodes', default=1, type=int, metavar='N',
-                        help='Number of nodes')
-    parser.add_argument('-g', '--num-gpus', default=1, type=int,
-                        help='Number of gpus per node')
     parser.add_argument('--resume-latest', default=False, action='store_true',
                         help='Resume from latest checkpoint')
-    parser.add_argument('-nr', '--node-rank', default=0, type=int,
-                        help='Node rank')
-    parser.add_argument('-m', '--master', default='localhost', type=str,
-                        help='IP address of master node')
-    parser.add_argument('-p', '--port', default='15000', type=str,
-                        help='Port to communicate over')
     parser.add_argument('-c', '--checkpoint', default=None, type=str,
                         help='Checkpoint file to load from')
-    parser.add_argument('-e', '--epochs', default=250, type=int,
-                        help='Number of epochs to use')
-    parser.add_argument('--no-pin-mem', default=False, action='store_true',
-                        help="Don't use pinned memory")
     parser.add_argument('--name', default='model', type=str,
                         help='Name to save model (no file extension)')
-    parser.add_argument('--checkpoint-dir', default=None, type=str,
-                        help='Checkpoint directory')
-    parser.add_argument('--log-dir', default=None, type=str,
-                        help='Logging directory')
-    parser.add_argument('--img-size', default=256, type=int,
-                        help='Single sided image resolution')
-    parser.add_argument('--batch-size', default=32, type=int,
-                        help='Batch size to use for training')
-    parser.add_argument('-s', '--seed', default=0, type=int,
-                        help='Seed to use for random values')
-    parser.add_argument('--devices', default=None, nargs='+',
-                        help='GPU IDs to train on')
-    args = parser.parse_args()
 
-    args.world_size = args.num_gpus * args.nodes
-    args.starting_epoch = None
-    args.pin_mem = not args.no_pin_mem
+    config = Config("model_config.yml")
+    parser.parse_args(namespace=config)
+
+    config.world_size = config.device_config.num_gpus * config.device_config.num_nodes
+    starting_epoch = None
 
     starttime = datetime.datetime.now()
 
     mp.set_sharing_strategy('file_system')
 
-    if args.devices:
-        args.num_gpus = len(args.devices)
+    assert config.device_config.num_gpus == len(config.device_config.devices), "Number of GPUs must match number of devices"
 
-    os.environ['MASTER_ADDR'] = args.master
-    os.environ['MASTER_PORT'] = args.port
+    os.environ['MASTER_ADDR'] = config.master_addr
+    os.environ['MASTER_PORT'] = config.port
 
     print("Importing Arrays")
-    if not os.path.exists(f"data/arrays/arrays_{args.img_size}.npz"):
+    if not os.path.exists(os.path.join(config.array_dir, f"arrays_{config.input_size[0]}.npz")):
         print("Arrays not found, generating...")
-        preprocessor = PreprocessImages("/data/ambouk3/datasets/NIH-X-Ray-Dataset",
-                                        args.img_size)
-        (X_train, y_train), (X_test, y_test) = preprocessor()
+        preprocessor = PreprocessImages(config.dataset_dir,
+                                        config.input_size[0])
+        X_train, y_train, X_test, y_test = preprocessor()
 
     else:
-        arrays = np.load(f"data/arrays/arrays_{args.img_size}.npz")
+        arrays = np.load(os.path.join(config.array_dir, f"arrays_{config.input_size[0]}.npz"))
         X_train = arrays['X_train']
         y_train = arrays['y_train']
         X_test = arrays['X_test']
@@ -281,13 +265,13 @@ if __name__ == '__main__':
     if not args.log_dir:
         args.log_dir = f"data/logs/{args.name}-{int(starttime.timestamp())}/"
 
-    if args.resume_latest:
-        checkpoint_dirs = os.listdir("data/checkpoints")
+    if config.resume_latest:
+        checkpoint_dirs = os.listdir(config.checkpoint_dir)
         checkpoint_dirs = [i for i in checkpoint_dirs if i[-10:].isdigit()]
         timestamps = [int(i[-10:]) for i in checkpoint_dirs]
         max_index = timestamps.index(max(timestamps))
-        args.checkpoint_dir = f"data/checkpoints/{checkpoint_dirs[max_index]}/"
-        checkpoints = os.listdir(args.checkpoint_dir)
+        config.checkpoint_dir = os.path.join(config.checkpoint_dir, checkpoint_dirs[max_index])
+        checkpoints = os.listdir(config.checkpoint_dir)
         checkpoint_nums = []
         for checkpoint in checkpoints:
             temp = []
@@ -297,19 +281,20 @@ if __name__ == '__main__':
             if temp:
                 checkpoint_nums.append(int(''.join(temp)))
         max_index = checkpoint_nums.index(max(checkpoint_nums))
-        args.starting_epoch = max(checkpoint_nums)+1
-        args.checkpoint = os.path.join(args.checkpoint_dir, checkpoints[max_index])
+        starting_epoch = max(checkpoint_nums)+1
+        config.checkpoint = os.path.join(config.checkpoint_dir, checkpoints[max_index])
 
-        log_dirs = os.listdir("data/logs")
+        log_dirs = os.listdir(config.log_dir)
         log_dirs = [i for i in log_dirs if i[-10:].isdigit()]
         timestamps = [int(i[-10:]) for i in log_dirs]
         max_index = timestamps.index(max(timestamps))
-        args.log_dir = f"data/logs/{log_dirs[max_index]}/"
+        config.log_dir = os.path.join(config.log_dir, log_dirs[max_index])
 
-    if not os.path.exists(args.checkpoint_dir):
-        os.mkdir(args.checkpoint_dir)
+    if not os.path.exists(config.checkpoint_dir):
+        os.makedirs(config.checkpoint_dir, exist_ok=True)
+    if not os.path.exists(config.log_dir):
+        os.makedirs(config.log_dir, exist_ok=True)
 
-    # Convert channels-last to channels-first format
     X_train = np.transpose(X_train, (0, 3, 1, 2))
     X_test = np.transpose(X_test, (0, 3, 1, 2))
 
@@ -334,5 +319,5 @@ if __name__ == '__main__':
 
     scaler = GradScaler()
 
-    func_args = (scaler, model, starttime, train_set, val_set, test_set, args)
-    mp.spawn(train, args=func_args, nprocs=args.num_gpus, join=True)
+    func_args = (scaler, model, starttime, train_set, val_set, test_set, config)
+    mp.spawn(train, args=func_args, nprocs=config.device_config.num_gpus, join=True)

@@ -6,13 +6,14 @@ import os
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.optim as optim
 from torch.cuda.amp import GradScaler, autocast
-from torch.optim import Adamax, lr_scheduler
 from torch.utils.data import DataLoader, TensorDataset, random_split
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from multithreaded_preprocessing import PreprocessImages
+from utils import Config
 
 # Parse command line arguments for the program
 
@@ -21,52 +22,33 @@ parser.add_argument('--resume-latest', default=False, action='store_true',
                     help='Resume from latest checkpoint')
 parser.add_argument('-c', '--checkpoint', default=None, type=str,
                     help='Checkpoint file to load from')
-parser.add_argument('-e', '--epochs', default=250, type=int,
-                    help='Number of epochs to use')
-parser.add_argument('--no-pin-mem', default=False, action='store_true',
-                    help="Don't use pinned memory")
 parser.add_argument('--name', default='model', type=str,
                     help='Name to save model (no file extension)')
-parser.add_argument('--checkpoint-dir', default=None, type=str,
-                    help='Checkpoint directory')
-parser.add_argument('--log-dir', default=None, type=str,
-                    help='Logging directory')
-parser.add_argument('--img-size', default=256, type=int,
-                    help='Single sided image resolution')
-parser.add_argument('--batch-size', default=32, type=int,
-                    help='Batch size to use for training')
-parser.add_argument('-s', '--seed', default=0, type=int,
-                    help='Seed to use for random values')
-parser.add_argument('--device', default=0, type=int,
-                    help='GPU ID to train on')
-args = parser.parse_args()
 
-args.pin_mem = not args.no_pin_mem
-args.starting_epoch = None
+config = Config("model_config.yml")
+parser.parse_args(namespace=config)
+starting_epoch = None
 
 # Set original timestamp for logging/checkpoint directories
 starttime = datetime.datetime.now()
 
 # Set the initial seed for training
-torch.manual_seed(args.seed)
+torch.manual_seed(config.seed)
 
-torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.benchmark = config.cudnn_benchmark
 
 # Create the checkpoint and logging directories
-if not args.checkpoint_dir:
-    args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime.timestamp())}/"
-
-if not args.log_dir:
-    args.log_dir = f"data/logs/{args.name}-{int(starttime.timestamp())}/"
+config.checkpoint_dir = os.path.join(config.checkpoint_dir, f"{config.name}-{int(starttime.timestamp())}")
+config.log_dir = os.path.join(config.log_dir, f"{config.name}-{int(starttime.timestamp())}")
 
 # Find latest checkpoint/logging directory and continue training from there
-if args.resume_latest:
-    checkpoint_dirs = os.listdir("data/checkpoints")
+if config.resume_latest:
+    checkpoint_dirs = os.listdir(config.checkpoint_dir)
     checkpoint_dirs = [i for i in checkpoint_dirs if i[-10:].isdigit()]
     timestamps = [int(i[-10:]) for i in checkpoint_dirs]
     max_index = timestamps.index(max(timestamps))
-    args.checkpoint_dir = f"data/checkpoints/{checkpoint_dirs[max_index]}/"
-    checkpoints = os.listdir(args.checkpoint_dir)
+    config.checkpoint_dir = os.path.join(config.checkpoint_dir, checkpoint_dirs[max_index])
+    checkpoints = os.listdir(config.checkpoint_dir)
     checkpoint_nums = []
     for checkpoint in checkpoints:
         temp = []
@@ -76,30 +58,32 @@ if args.resume_latest:
         if temp:
             checkpoint_nums.append(int(''.join(temp)))
     max_index = checkpoint_nums.index(max(checkpoint_nums))
-    args.starting_epoch = max(checkpoint_nums)+1
-    args.checkpoint = os.path.join(args.checkpoint_dir, checkpoints[max_index])
+    starting_epoch = max(checkpoint_nums)+1
+    config.checkpoint = os.path.join(config.checkpoint_dir, checkpoints[max_index])
 
-    log_dirs = os.listdir("data/logs")
+    log_dirs = os.listdir(config.log_dir)
     log_dirs = [i for i in log_dirs if i[-10:].isdigit()]
     timestamps = [int(i[-10:]) for i in log_dirs]
     max_index = timestamps.index(max(timestamps))
-    args.log_dir = f"data/logs/{log_dirs[max_index]}/"
+    config.log_dir = os.path.join(config.log_dir, log_dirs[max_index])
 
 # Create checkpoint directory folder
-if not os.path.exists(args.checkpoint_dir):
-    os.mkdir(args.checkpoint_dir)
+if not os.path.exists(config.checkpoint_dir):
+    os.makedirs(config.checkpoint_dir, exist_ok=True)
+if not os.path.exists(config.log_dir):
+    os.makedirs(config.log_dir, exist_ok=True)
 
 print("Importing Arrays")
 # If array files are not found, preprocess images to create arrays
-if not os.path.exists(f"data/arrays/arrays_{args.img_size}.npz"):
+if not os.path.exists(os.path.join(config.array_dir, f"arrays_{config.input_size[0]}.npz")):
     print("Arrays not found, generating...")
-    preprocessor = PreprocessImages("F:/Datasets/NIH X-Rays/data",
-                                    args.img_size)
-    (X_train, y_train), (X_test, y_test) = preprocessor()
+    preprocessor = PreprocessImages(config.dataset_dir,
+                                    config.input_size[0])
+    X_train, y_train, X_test, y_test = preprocessor()
 
 # Import preprocessed data arrays
 else:
-    arrays = np.load(f"data/arrays/arrays_{args.img_size}.npz")
+    arrays = np.load(os.path.join(config.array_dir, f"arrays_{config.input_size[0]}.npz"))
     X_train = arrays['X_train']
     y_train = arrays['y_train']
     X_test = arrays['X_test']
@@ -120,15 +104,31 @@ model.classifier = nn.Sequential(
 )
 
 # Move model to GPU memory
-model.to(args.device)
+model.to(config.device_config.devices[0])
 # Load model checkpoint
-if args.checkpoint:
-    model.load_state_dict(torch.load(args.checkpoint))
+if config.checkpoint:
+    model.load_state_dict(torch.load(config.checkpoint))
 
 # Initialize loss and optimizer functions
-loss_fn = nn.MultiLabelSoftMarginLoss().to(args.device)
-optimizer = Adamax(model.parameters(), lr=1e-6)
-scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
+if config.loss_algorithm == 'cross_entropy':
+    loss_alg = nn.CrossEntropyLoss
+elif config.loss_algorithm == 'binary_crossentropy':
+    loss_alg = nn.BCEWithLogitsLoss
+elif config.loss_algorithm == 'mean_squared_error':
+    loss_alg = nn.MSELoss
+else:
+    raise ValueError("Invalid loss algorithm")
+
+if config.optimizer == 'adamax':
+    optimizer = optim.Adamax
+elif config.optimizer == 'adam':
+    optimizer = optim.Adam
+else:
+    raise ValueError("Invalid optimizer")
+
+loss_fn = loss_alg().to(config.device_config.devices[0])
+optimizer = optimizer(model.parameters(), lr=config.learning_rate)
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 mse_fn = nn.MSELoss()
 
 # Convert NumPy arrays to PyTorch tensors
@@ -143,20 +143,20 @@ train_num = int(len(dataset)*0.7)
 train_set, val_set = random_split(dataset, [train_num, len(dataset)-train_num])
 test_set = TensorDataset(X_test, y_test)
 traindata = DataLoader(train_set, shuffle=True, drop_last=True,
-                       pin_memory=args.pin_mem, batch_size=args.batch_size)
+                       pin_memory=config.pin_mem, batch_size=config.batch_size)
 valdata = DataLoader(val_set, shuffle=True, drop_last=True,
-                     pin_memory=args.pin_mem, batch_size=args.batch_size)
+                     pin_memory=config.pin_mem, batch_size=config.batch_size)
 testdata = DataLoader(test_set, shuffle=True, drop_last=True,
-                      pin_memory=args.pin_mem, batch_size=args.batch_size)
+                      pin_memory=config.pin_mem, batch_size=config.batch_size)
 
 best_model_wts = copy.deepcopy(model.state_dict())
 
 # Initialize tensorboard logging
-writer = SummaryWriter(args.log_dir)
+writer = SummaryWriter(config.log_dir)
 
 # Create model graph in tensorboard
-dummy_input_shape = (1, 1, args.img_size, args.img_size)
-dummy_input = torch.randn(*dummy_input_shape, device=args.device)
+dummy_input_shape = (1, 1, *config.input_size)
+dummy_input = torch.randn(*dummy_input_shape, device=config.device_config.devices[0])
 writer.add_graph(model, dummy_input)
 writer.flush()
 
@@ -164,10 +164,10 @@ writer.flush()
 scaler = GradScaler()
 
 # Iterate over epochs
-for epoch in range(args.epochs):
-    if args.starting_epoch:
-        epoch += args.starting_epoch
-    print(f"Epoch {epoch+1}/{args.epochs}")
+for epoch in range(config.epochs):
+    if starting_epoch:
+        epoch += starting_epoch
+    print(f"Epoch {epoch+1}/{config.epochs}")
     print('='*61)
 
     # Initialize running loss and running mse
@@ -184,7 +184,7 @@ for epoch in range(args.epochs):
     for index, (inputs, labels) in enumerate(progressbar):
 
         # Move data to GPU memory
-        inputs, labels = inputs.to(args.device), labels.to(args.device)
+        inputs, labels = inputs.to(config.device_config.devices[0]), labels.to(config.device_config.devices[0])
 
         # Zero gradient for optimizer
         optimizer.zero_grad(set_to_none=True)
@@ -227,7 +227,7 @@ MSE: {running_mse/(index+1):.5f}')
     for index, (inputs, labels) in enumerate(progressbar):
 
         # Move data to GPU memory
-        inputs, labels = inputs.to(args.device), labels.to(args.device)
+        inputs, labels = inputs.to(config.device_config.devices[0]), labels.to(config.device_config.devices[0])
 
         # Disable gradient
         with torch.no_grad():
@@ -253,7 +253,7 @@ MSE: {running_mse/(index+1):.5f}')
     if 'best_loss' not in locals() or val_mse < best_loss:
         best_loss = val_mse
         best_model_wts = copy.deepcopy(model.state_dict())
-        path = os.path.join(args.checkpoint_dir, 'best_weights.pth')
+        path = os.path.join(config.checkpoint_dir, 'best_weights.pth')
         torch.save(best_model_wts, path)
 
     # Log the loss and mse to tensorboard
@@ -264,7 +264,7 @@ MSE: {running_mse/(index+1):.5f}')
     writer.flush()
 
     # Save model checkpoint
-    checkpoint_path = os.path.join(args.checkpoint_dir,
+    checkpoint_path = os.path.join(config.checkpoint_dir,
                                    f"checkpoint-{epoch:03d}.pth")
     torch.save(model.state_dict(), checkpoint_path)
     print(f"Checkpoint saved to checkpoint-{epoch:03d}.pth\n")
@@ -294,7 +294,7 @@ progressbar = tqdm(testdata, desc="Testing", unit='steps', dynamic_ncols=True)
 for index, (inputs, labels) in enumerate(progressbar):
 
     # Move data to GPU memory
-    inputs, labels = inputs.to(args.device), labels.to(args.device)
+    inputs, labels = inputs.to(config.device_config.devices[0]), labels.to(config.device_config.devices[0])
 
     # Disable gradient
     with torch.no_grad():
@@ -314,8 +314,6 @@ Test MSE: {running_mse/(index+1):.5f}')
 
 # Save model weights
 print("Saving model weights")
-savepath = f"data/models/{args.name}-{int(starttime.timestamp())}.pth"
-savepath_weights = f"data/models/{args.name}-{int(starttime.timestamp())}_weights.pth"
-torch.save(model.state_dict(), savepath_weights)
-torch.save(model, savepath)
+savepath = os.path.join(config.model_dir, f"{config.name}-{int(starttime.timestamp())}_weights.pth")
+torch.save(model.state_dict(), savepath)
 print("Model saved!\n")
