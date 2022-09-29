@@ -1,0 +1,30 @@
+log_dir: ./data/logs
+checkpoint_dir: ./data/checkpoints
+dataset_dir: F:/Datasets/NIH X-Rays/data
+array_dir: ./data/arrays
+model_dir: ./data/models
+
+input_size: (512, 512)
+grayscale: True
+num_classes: 14
+batch_size: 16
+epochs: 250
+optimizer: Adam
+loss_algorithm: binary_crossentropy
+learning_rate: 0.000001
+
+cudnn_benchmark: True
+pin_memory: True
+seed: 0
+
+device_config:
+  devices: [0]
+  num_gpus: 1
+  num_nodes: 1
+  node_rank: 0
+  master_addr: localhost
+  port: 15000
+
+model:
+  num_blocks: 5
+  num_layers_per_block: 3
