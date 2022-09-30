@@ -7,11 +7,10 @@ import numpy as np
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
-import torch.nn as nn
+from torch import nn, optim
 from torch.cuda.amp import GradScaler, autocast
 from torch.distributed.optim import ZeroRedundancyOptimizer
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.optim import Adamax, lr_scheduler
 from torch.utils.data import DataLoader, Dataset, TensorDataset, random_split
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
@@ -45,9 +44,9 @@ def train(proc: int, scaler: GradScaler, model: nn.Module, starttime: datetime.d
     if config.checkpoint:
         ddp_model.load_state_dict(torch.load(config.checkpoint))
 
-    trainsampler = DistributedSampler(train_set, num_replicas=args.num_gpus)
-    valsampler = DistributedSampler(val_set, num_replicas=args.num_gpus)
-    testsampler = DistributedSampler(test_set, num_replicas=args.num_gpus)
+    trainsampler = DistributedSampler(train_set, num_replicas=config.device_config.num_gpus)
+    valsampler = DistributedSampler(val_set, num_replicas=config.device_config.num_gpus)
+    testsampler = DistributedSampler(test_set, num_replicas=config.device_config.num_gpus)
 
     traindata = DataLoader(train_set, pin_memory=config.pin_mem, drop_last=True,
                            batch_size=config.batch_size, sampler=trainsampler)
@@ -258,12 +257,6 @@ if __name__ == '__main__':
         y_train = arrays['y_train']
         X_test = arrays['X_test']
         y_test = arrays['y_test']
-
-    if not args.checkpoint_dir:
-        args.checkpoint_dir = f"data/checkpoints/{args.name}-{int(starttime.timestamp())}/"
-
-    if not args.log_dir:
-        args.log_dir = f"data/logs/{args.name}-{int(starttime.timestamp())}/"
 
     if config.resume_latest:
         checkpoint_dirs = os.listdir(config.checkpoint_dir)
