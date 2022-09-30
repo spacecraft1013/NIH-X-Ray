@@ -19,9 +19,15 @@ class NIHXRayModel(nn.Module):
     def forward(self, x) -> torch.Tensor:
         assert self.layers is not None, "Model must be built before utilization"
         input_tensor = x
+        if self.config.structure == 'dense':
+            conns = [x]
         for layer in self.layers:
             x = layer(x)
-        x += input_tensor
+            if self.config.structure == 'dense':
+                conns.append(x)
+                x = torch.sum(conns)
+        if self.config.structure == 'res':
+            x += input_tensor
         x = self.output_block(x)
         return x
 

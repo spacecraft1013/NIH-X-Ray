@@ -26,6 +26,7 @@ device_config:
   port: 15000
 
 model:
+  structure: res # res, dense, or ff
   num_blocks: 5
   num_layers_per_block: 3
   num_filters: 32
