@@ -28,3 +28,8 @@ device_config:
 model:
   num_blocks: 5
   num_layers_per_block: 3
+  num_filters: 32
+  input_filter_size: 7
+  kernel_size: 3
+  stride: 1
+  classification_hidden_features: 2048

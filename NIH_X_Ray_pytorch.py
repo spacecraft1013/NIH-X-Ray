@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader, TensorDataset, random_split
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+from model import NIHXRayModel
 from multithreaded_preprocessing import PreprocessImages
 from utils import Config
 
@@ -94,14 +95,7 @@ X_train = np.transpose(X_train, (0, 3, 1, 2))
 X_test = np.transpose(X_test, (0, 3, 1, 2))
 
 # Load densenet201 model and modify to work for these images
-model = torch.hub.load('pytorch/vision:v0.11.1', 'densenet201',
-                       pretrained=True)
-model.features[0] = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2),
-                              padding=(3, 3), bias=False)
-model.classifier = nn.Sequential(
-    nn.Linear(in_features=1920, out_features=14, bias=True),
-    nn.Sigmoid()
-)
+model = NIHXRayModel(config.model, config.input_size, config.num_classes)
 
 # Move model to GPU memory
 model.to(config.device_config.devices[0])
